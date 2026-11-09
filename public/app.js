@@ -194,6 +194,7 @@ function updateHeaderExitButton(visible) {
       btn.classList.add('hidden');
       btn.style.display = 'none';
     }
+  }
 }
 
 function updateConnectionBadge(status) {
