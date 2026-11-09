@@ -373,6 +373,25 @@
     </div>
   </div>
 
+  <!-- Exit Confirmation Modal (100% iframe/webview safe, zero native dialog blocks) -->
+  <div class="modal-overlay hidden" id="modal-confirm-exit" style="display:none;">
+    <div class="modal-card" style="max-width:380px;">
+      <span style="font-size:2.4rem; display:block; margin-bottom:0.4rem;">🚪</span>
+      <h3 style="font-weight:900; font-size:1.25rem; margin-bottom:0.4rem;">¿Salir de la partida?</h3>
+      <p style="font-size:0.88rem; color:var(--text-muted); margin-bottom:1.25rem;">
+        Perderás tu progreso en esta sala y regresarás al menú principal.
+      </p>
+      <div style="display:flex; gap:0.65rem; justify-content:center;">
+        <button type="button" class="btn-secondary" id="btn-cancel-exit" style="flex:1;">
+          Continuar jugando
+        </button>
+        <button type="button" class="btn-primary" id="btn-do-exit" style="flex:1; background:#ef4444; border-color:#dc2626;">
+          Sí, Salir
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="/qrcode.min.js"></script>
   <script src="/audio.js"></script>

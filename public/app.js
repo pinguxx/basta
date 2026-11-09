@@ -209,15 +209,34 @@ function getWebSocketProtocol() {
 }
 
 function confirmAndExitGame() {
-  const msg = state.phase === 'GameOver'
-    ? '¿Deseas salir al menú principal?'
-    : '¿Seguro que deseas salir de la partida actual? Perderás tu progreso en esta sala.';
-  if (confirm(msg)) {
+  const phase = (state.phase || '').toLowerCase();
+  // If game is over, in lobby, or on welcome screen, exit directly without prompt
+  if (phase === 'gameover' || phase === 'lobby' || phase === 'welcome' || !state.roomCode) {
+    exitGame();
+    return;
+  }
+
+  // During active game / review, show in-page confirmation modal (100% iframe safe)
+  const modal = document.getElementById('modal-confirm-exit');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  } else {
     exitGame();
   }
 }
 
+function closeExitModal() {
+  const modal = document.getElementById('modal-confirm-exit');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+}
+
 function exitGame() {
+  closeExitModal();
+
   // Clear offline timers
   if (state.botBastaTimer) {
     clearTimeout(state.botBastaTimer);
@@ -232,13 +251,22 @@ function exitGame() {
     state.pingInterval = null;
   }
 
+  // Hide alert banner and modals
+  const alertBanner = document.getElementById('basta-alert-banner');
+  if (alertBanner) {
+    alertBanner.classList.add('hidden');
+    alertBanner.style.display = 'none';
+  }
+  const qrModal = document.getElementById('modal-qr');
+  if (qrModal) qrModal.classList.add('hidden');
+
   // Notify server if online
   if (!useOfflineEngine && state.ws && state.ws.readyState === WebSocket.OPEN) {
-    sendWSMessage({
-      type: 'leave_room',
-      player_id: state.playerId || '',
-    });
     try {
+      sendWSMessage({
+        type: 'leave_room',
+        player_id: state.playerId || '',
+      });
       state.ws.close();
     } catch (_) {}
   }
@@ -262,11 +290,17 @@ function exitGame() {
   state.botBastaTargetTime = null;
   useOfflineEngine = false;
 
-  // Reset URL query parameters without reloading
-  if (window.history && window.history.replaceState) {
-    const cleanUrl = window.location.origin + window.location.pathname;
-    window.history.replaceState({}, document.title, cleanUrl);
-  }
+  // Clear room code input
+  const inputCode = document.getElementById('input-room-code');
+  if (inputCode) inputCode.value = '';
+
+  // Reset URL query parameters safely without throwing in sandboxed iframes
+  try {
+    if (window.history && window.history.replaceState && window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file')) {
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  } catch (_) {}
 
   // Hide header exit button and room pill, then return to welcome view
   updateHeaderExitButton(false);
@@ -586,10 +620,10 @@ function bindUIEvents() {
     btnCopyCode.addEventListener('click', copyRoomCode);
   }
 
-  // Exit Game Buttons (Lobby, Header, Playing, Review, GameOver)
+  // Exit Game Buttons (Lobby, Header, Playing, Review, GameOver, Brand)
   const btnLeaveLobby = document.getElementById('btn-leave-lobby');
   if (btnLeaveLobby) {
-    btnLeaveLobby.addEventListener('click', confirmAndExitGame);
+    btnLeaveLobby.addEventListener('click', exitGame);
   }
 
   const btnGlobalExit = document.getElementById('btn-global-exit');
@@ -609,8 +643,49 @@ function bindUIEvents() {
 
   const btnExitGameOver = document.getElementById('btn-exit-gameover');
   if (btnExitGameOver) {
-    btnExitGameOver.addEventListener('click', confirmAndExitGame);
+    btnExitGameOver.addEventListener('click', exitGame);
   }
+
+  const headerBrandHome = document.getElementById('header-brand-home');
+  if (headerBrandHome) {
+    headerBrandHome.addEventListener('click', () => {
+      if (state.roomCode && state.phase !== 'welcome') {
+        confirmAndExitGame();
+      }
+    });
+  }
+
+  // In-page Exit Confirmation Modal Listeners (100% iframe/webview safe)
+  const btnCancelExit = document.getElementById('btn-cancel-exit');
+  if (btnCancelExit) {
+    btnCancelExit.addEventListener('click', closeExitModal);
+  }
+
+  const btnDoExit = document.getElementById('btn-do-exit');
+  if (btnDoExit) {
+    btnDoExit.addEventListener('click', () => {
+      closeExitModal();
+      exitGame();
+    });
+  }
+
+  const modalConfirmExit = document.getElementById('modal-confirm-exit');
+  if (modalConfirmExit) {
+    modalConfirmExit.addEventListener('click', (e) => {
+      if (e.target === modalConfirmExit) {
+        closeExitModal();
+      }
+    });
+  }
+
+  // Global Escape key to dismiss modals
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeExitModal();
+      const qrModal = document.getElementById('modal-qr');
+      if (qrModal) qrModal.classList.add('hidden');
+    }
+  });
 
   // Language Mode Selector
   const selectLang = document.getElementById('select-language-mode');
