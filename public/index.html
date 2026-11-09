@@ -6,27 +6,73 @@
   <meta name="theme-color" content="#dc2626" />
   <meta name="description" content="✏️ Basta Online (Stop / Tutti Frutti) • Clásico juego tradicional de palabras en Rust y WebSockets con bots mexicanos, audio procedural y votación en tiempo real." />
   <title>Basta Online • Juego de Palabras Tradicional Mexicano</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Fredoka:wght@600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <!-- Festive Top Strip -->
-  <div class="festive-ribbon"></div>
-
-  <!-- Header -->
-  <header class="app-header">
-    <div class="logo-group">
-      <div class="logo-badge">✏️</div>
-      <div class="logo-text">
-        <h1>¡BASTA!</h1>
-        <p>Juego Tradicional de Palabras</p>
+  <!-- Floating Mexican Game Header -->
+  <header class="app-header-wrapper">
+    <div class="app-header-card">
+      <!-- Festive Papel Picado Garland -->
+      <div class="papel-picado-garland" aria-hidden="true">
+        <span class="flag flag-pink"></span>
+        <span class="flag flag-yellow"></span>
+        <span class="flag flag-green"></span>
+        <span class="flag flag-blue"></span>
+        <span class="flag flag-purple"></span>
+        <span class="flag flag-red"></span>
+        <span class="flag flag-orange"></span>
+        <span class="flag flag-teal"></span>
       </div>
-    </div>
-    <div class="header-controls">
-      <span class="player-badge" id="header-room-pill" style="display:none">Sala: ----</span>
-      <button class="btn-icon btn-exit-nav" id="btn-global-exit" title="Salir de la partida" style="display:none;">🚪 Salir</button>
-      <button class="btn-icon" id="btn-qr-invite" title="Invitar con código QR">📱 QR</button>
-      <button class="btn-icon" id="btn-theme" title="Cambiar tema visual">🎨</button>
-      <button class="btn-icon" id="btn-audio" title="Efectos de sonido">🔊</button>
+
+      <div class="header-main-bar">
+        <!-- Brand / Logo Group -->
+        <div class="basta-brand-group" id="header-brand-home" title="¡Basta para mí, basta para todos!">
+          <div class="pencil-badge-glow">
+            <span class="pencil-icon">✏️</span>
+          </div>
+          <div class="brand-titles">
+            <div class="letter-blocks-row" aria-label="BASTA!">
+              <span class="letter-block letter-b">B</span>
+              <span class="letter-block letter-a1">A</span>
+              <span class="letter-block letter-s">S</span>
+              <span class="letter-block letter-t">T</span>
+              <span class="letter-block letter-a2">A</span>
+              <span class="letter-block letter-ex">!</span>
+            </div>
+            <span class="brand-tagline">🇲🇽 JUEGO TRADICIONAL MEXICANO</span>
+          </div>
+        </div>
+
+        <!-- Center: Active Room Status Indicator -->
+        <div class="header-room-indicator hidden" id="header-room-pill" style="display:none;" title="Haz clic para copiar el código de sala">
+          <span class="live-dot-pulse"></span>
+          <span class="room-label-text">SALA: ----</span>
+          <span class="copy-badge-icon">📋</span>
+        </div>
+
+        <!-- Controls / Actions -->
+        <div class="header-controls">
+          <button class="header-action-btn btn-exit-nav hidden" id="btn-global-exit" title="Salir de la partida">
+            <span class="btn-icon-symbol">🚪</span>
+            <span class="btn-label-text">Salir</span>
+          </button>
+          <button class="header-action-btn" id="btn-qr-invite" title="Invitar con código QR">
+            <span class="btn-icon-symbol">📱</span>
+            <span class="btn-label-text">QR</span>
+          </button>
+          <button class="header-action-btn" id="btn-theme" title="Cambiar tema visual (Cuaderno / Feria / Talavera)">
+            <span class="btn-icon-symbol">🎨</span>
+            <span class="btn-label-text">Tema</span>
+          </button>
+          <button class="header-action-btn" id="btn-audio" title="Efectos de sonido (Activado / Silencio)">
+            <span class="btn-icon-symbol">🔊</span>
+            <span class="btn-label-text">Audio</span>
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -40,11 +86,11 @@
     <section class="view-panel active" id="view-welcome">
       <div class="welcome-card">
         <div class="welcome-header" style="text-align:center; margin-bottom:1.25rem;">
-          <h1 style="font-size:1.85rem; margin:0 0 0.35rem 0; font-family:'Bungee', cursive, sans-serif; color:var(--accent-primary); letter-spacing:1px;">
-            ✏️ ¡Basta! Mexicano
-          </h1>
-          <p style="font-size:0.88rem; color:var(--text-muted); margin:0;">
-            El tradicional juego de palabras, agilidad mental y picardía
+          <h2 style="font-size:1.55rem; margin:0 0 0.35rem 0; font-family:'Fredoka', var(--font-family); font-weight:800; color:var(--text-main); letter-spacing:-0.01em;">
+            ¡Bienvenido a la Partida! 🎉
+          </h2>
+          <p style="font-size:0.9rem; color:var(--text-muted); margin:0;">
+            Elige tu apodo mexicano y crea una sala privada o únete a tus amigos
           </p>
         </div>
 

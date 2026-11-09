@@ -165,13 +165,34 @@ function clearSavedSession() {
   } catch (_) {}
 }
 
+function updateHeaderRoomPill(roomCode) {
+  const pill = document.getElementById('header-room-pill');
+  if (!pill) return;
+  if (roomCode && state.phase !== 'welcome' && state.roomCode) {
+    pill.classList.remove('hidden');
+    pill.style.display = 'inline-flex';
+    pill.innerHTML = `
+      <span class="live-dot-pulse"></span>
+      <span class="room-label-text">SALA: <strong>${escapeHTML(roomCode)}</strong></span>
+      <span class="copy-badge-icon" title="Copiar código">📋</span>
+    `;
+    pill.title = `Sala ${roomCode} • Clic para copiar código`;
+  } else {
+    pill.classList.add('hidden');
+    pill.style.display = 'none';
+    pill.innerHTML = '';
+  }
+}
+
 function updateHeaderExitButton(visible) {
   const btn = document.getElementById('btn-global-exit');
   if (btn) {
     if (visible) {
       btn.classList.remove('hidden');
+      btn.style.display = 'inline-flex';
     } else {
       btn.classList.add('hidden');
+      btn.style.display = 'none';
     }
   }
 }
@@ -236,10 +257,9 @@ function exitGame() {
     window.history.replaceState({}, document.title, cleanUrl);
   }
 
-  // Hide header exit button and return to welcome view
+  // Hide header exit button and room pill, then return to welcome view
   updateHeaderExitButton(false);
-  const pill = document.getElementById('header-room-pill');
-  if (pill) pill.textContent = '¡Basta!';
+  updateHeaderRoomPill('');
   showView('welcome');
 }
 
@@ -259,10 +279,8 @@ function restoreGameSession(savedSession) {
   state.latestReview = savedSession.latestReview || null;
   state.history = savedSession.history || [];
 
-  // Update room pill
-  const pill = document.getElementById('header-room-pill');
-  if (pill) pill.textContent = `Sala: ${state.roomCode}`;
-
+  // Update room pill and exit button
+  updateHeaderRoomPill(state.roomCode);
   updateHeaderExitButton(true);
 
   if (savedSession.isOffline || useOfflineEngine) {
@@ -333,14 +351,28 @@ function initApp() {
 
 function bindUIEvents() {
   // Theme Toggle
-  document.getElementById('btn-theme').addEventListener('click', toggleTheme);
+  const btnTheme = document.getElementById('btn-theme');
+  if (btnTheme) {
+    btnTheme.addEventListener('click', toggleTheme);
+  }
 
   // Audio Toggle
   const btnAudio = document.getElementById('btn-audio');
-  btnAudio.addEventListener('click', () => {
-    const isMuted = window.soundFX.toggleMute();
-    btnAudio.textContent = isMuted ? '🔇' : '🔊';
-  });
+  if (btnAudio) {
+    btnAudio.addEventListener('click', () => {
+      const isMuted = window.soundFX.toggleMute();
+      btnAudio.innerHTML = `<span class="btn-icon-symbol">${isMuted ? '🔇' : '🔊'}</span><span class="btn-label-text">${isMuted ? 'Mudo' : 'Audio'}</span>`;
+      btnAudio.title = isMuted ? 'Sonido desactivado (clic para activar)' : 'Sonido activado (clic para silenciar)';
+    });
+  }
+
+  // Header Room Pill Click to Copy
+  const headerRoomPill = document.getElementById('header-room-pill');
+  if (headerRoomPill) {
+    headerRoomPill.addEventListener('click', () => {
+      if (state.roomCode) copyRoomCode();
+    });
+  }
 
   // Avatar Picker
   document.querySelectorAll('.avatar-choice').forEach(el => {
@@ -611,9 +643,23 @@ function setupURLParameters() {
   }
 }
 
+function updateThemeButtonLabel(theme) {
+  const btn = document.getElementById('btn-theme');
+  if (!btn) return;
+  const labels = {
+    cuaderno: 'Cuaderno',
+    feria: 'Feria',
+    talavera: 'Talavera',
+  };
+  const label = labels[theme] || 'Tema';
+  btn.innerHTML = `<span class="btn-icon-symbol">🎨</span><span class="btn-label-text">${label}</span>`;
+  btn.title = `Tema: ${label} (clic para cambiar estilo visual)`;
+}
+
 function initTheme() {
   const saved = localStorage.getItem('basta_theme') || 'cuaderno';
   document.documentElement.setAttribute('data-theme', saved);
+  updateThemeButtonLabel(saved);
 }
 
 function toggleTheme() {
@@ -622,6 +668,7 @@ function toggleTheme() {
   const next = themes[(themes.indexOf(cur) + 1) % themes.length];
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('basta_theme', next);
+  updateThemeButtonLabel(next);
 }
 
 // Switch UI Views
@@ -747,7 +794,7 @@ function syncState(serverState) {
   }
 
   // Update Room Header
-  document.getElementById('header-room-pill').textContent = `Sala: ${state.roomCode}`;
+  updateHeaderRoomPill(state.roomCode);
   updateHeaderExitButton(true);
   saveGameSession();
 

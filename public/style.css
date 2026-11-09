@@ -81,88 +81,328 @@ body {
   overflow-x: hidden;
 }
 
-/* Festive Top Ribbon */
-.festive-ribbon {
-  height: 6px;
+/* ========================================================================== */
+/* 🌟 MODERN MEXICAN FLOATING GAME HEADER & PAPEL PICADO GARLAND             */
+/* ========================================================================== */
+
+.app-header-wrapper {
+  position: sticky;
+  top: 0.65rem;
+  z-index: 100;
   width: 100%;
-  background: repeating-linear-gradient(
-    90deg,
-    #10b981 0px,
-    #10b981 24px,
-    #f59e0b 24px,
-    #f59e0b 48px,
-    #ef4444 48px,
-    #ef4444 72px,
-    #06b6d4 72px,
-    #06b6d4 96px,
-    #ec4899 96px,
-    #ec4899 120px
-  );
+  padding: 0 1rem;
 }
 
-/* Header */
-.app-header {
+.app-header-card {
+  max-width: 1020px;
+  margin: 0 auto;
+  background: var(--bg-sheet);
+  border: 1.5px solid var(--border-soft);
+  border-radius: 20px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+/* 🎨 Mexican Papel Picado Garland Along Top */
+.papel-picado-garland {
+  display: flex;
+  width: 100%;
+  height: 9px;
+  background: transparent;
+  gap: 4px;
+  padding: 0 6px;
+  overflow: hidden;
+  user-select: none;
+}
+
+.papel-picado-garland .flag {
+  flex: 1;
+  height: 100%;
+  clip-path: polygon(0% 0%, 100% 0%, 100% 65%, 50% 100%, 0% 65%);
+  transition: transform 0.2s ease;
+}
+
+.papel-picado-garland .flag-pink   { background: #ec4899; }
+.papel-picado-garland .flag-yellow { background: #f59e0b; }
+.papel-picado-garland .flag-green  { background: #10b981; }
+.papel-picado-garland .flag-blue   { background: #0284c7; }
+.papel-picado-garland .flag-purple { background: #8b5cf6; }
+.papel-picado-garland .flag-red    { background: #ef4444; }
+.papel-picado-garland .flag-orange { background: #f97316; }
+.papel-picado-garland .flag-teal   { background: #14b8a6; }
+
+/* Main Header Content Bar */
+.header-main-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1.25rem;
-  background: var(--bg-sheet);
-  border-bottom: 1px solid var(--border-soft);
-  box-shadow: var(--shadow-sm);
-  position: sticky;
-  top: 0;
-  z-index: 50;
+  padding: 0.55rem 1.15rem 0.65rem;
+  gap: 0.85rem;
 }
 
-.logo-group {
+/* ✏️ Brand Group */
+.basta-brand-group {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-}
-
-.logo-badge {
-  font-size: 1.6rem;
-  background: var(--bg-elevated);
-  padding: 0.25rem 0.5rem;
-  border-radius: 8px;
-  box-shadow: var(--shadow-sm);
-}
-
-.logo-text h1 {
-  font-size: 1.25rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--text-main);
-}
-
-.logo-text p {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-
-.header-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-icon {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-soft);
-  color: var(--text-main);
-  padding: 0.45rem 0.65rem;
-  border-radius: 8px;
-  font-size: 0.95rem;
+  gap: 0.75rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  text-decoration: none;
+  user-select: none;
+  transition: transform 0.2s ease;
+}
+
+.basta-brand-group:hover {
+  transform: translateY(-1px);
+}
+
+.pencil-badge-glow {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #fef08a, #f59e0b);
+  border: 2px solid #d97706;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);
+  transform: rotate(-8deg);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  flex-shrink: 0;
 }
 
-.btn-icon:hover {
+.pencil-badge-glow .pencil-icon {
+  font-size: 1.55rem;
+  line-height: 1;
+  display: inline-block;
+}
+
+.basta-brand-group:hover .pencil-badge-glow {
+  transform: rotate(10deg) scale(1.1);
+}
+
+.brand-titles {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* 3D Dimensional Letter Blocks */
+.letter-blocks-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 3.5px;
+}
+
+.letter-block {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 31px;
+  padding: 0 5px;
+  border-radius: 6px;
+  font-family: 'Bungee', 'Fredoka', 'Arial Black', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #ffffff;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.22), 0 4px 8px rgba(0, 0, 0, 0.12);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+
+.basta-brand-group:hover .letter-block {
+  transform: translateY(-2px);
+}
+
+.letter-b  { background: linear-gradient(180deg, #f43f5e, #be123c); transform: rotate(-3deg); }
+.letter-a1 { background: linear-gradient(180deg, #fbbf24, #d97706); transform: rotate(2deg); }
+.letter-s  { background: linear-gradient(180deg, #34d399, #059669); transform: rotate(-2deg); }
+.letter-t  { background: linear-gradient(180deg, #38bdf8, #0284c7); transform: rotate(3deg); }
+.letter-a2 { background: linear-gradient(180deg, #c084fc, #7e22ce); transform: rotate(-1deg); }
+.letter-ex { background: linear-gradient(180deg, #f87171, #dc2626); transform: rotate(4deg); }
+
+.brand-tagline {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+/* 🟢 Center Room Indicator Badge */
+.header-room-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--accent-secondary);
+  color: var(--text-main);
+  padding: 0.38rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  user-select: none;
+}
+
+.header-room-indicator:hover {
   background: var(--border-soft);
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.header-room-indicator .live-dot-pulse {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulseGreen 1.8s infinite;
+}
+
+.header-room-indicator .copy-badge-icon {
+  font-size: 0.82rem;
+  opacity: 0.7;
+}
+
+@keyframes pulseGreen {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+/* 🕹️ Controls */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.header-action-btn,
+.btn-icon {
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-soft);
+  color: var(--text-main);
+  padding: 0.45rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
+}
+
+.header-action-btn:hover,
+.btn-icon:hover {
+  background: var(--border-soft);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.header-action-btn:active,
+.btn-icon:active {
+  transform: scale(0.95) translateY(0);
+}
+
+.header-action-btn.btn-exit-nav {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  color: #ef4444 !important;
+}
+
+.header-action-btn.btn-exit-nav:hover {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border-color: #ef4444 !important;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35) !important;
+}
+
+/* Theme-Specific Header Enhancements */
+html[data-theme="cuaderno"] .app-header-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.07);
+}
+
+html[data-theme="feria"] .app-header-card {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(251, 191, 36, 0.35);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.5), 0 0 20px rgba(244, 63, 94, 0.15);
+}
+
+html[data-theme="talavera"] .app-header-card {
+  background: rgba(16, 36, 66, 0.95);
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.6), 0 0 25px rgba(2, 132, 199, 0.2);
+}
+
+/* Responsive Header Adjustments */
+@media (max-width: 768px) {
+  .app-header-wrapper {
+    padding: 0 0.5rem;
+    top: 0.4rem;
+  }
+  .header-main-bar {
+    padding: 0.45rem 0.75rem;
+    gap: 0.5rem;
+  }
+  .letter-block {
+    min-width: 24px;
+    height: 28px;
+    font-size: 0.95rem;
+  }
+  .pencil-badge-glow {
+    width: 36px;
+    height: 36px;
+  }
+  .pencil-badge-glow .pencil-icon {
+    font-size: 1.25rem;
+  }
+  .brand-tagline {
+    font-size: 0.55rem;
+  }
+  .btn-label-text {
+    display: none;
+  }
+  .header-action-btn,
+  .btn-icon {
+    padding: 0.42rem 0.55rem;
+    border-radius: 10px;
+  }
+  .header-room-indicator {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-tagline {
+    display: none;
+  }
+  .letter-block {
+    min-width: 22px;
+    height: 26px;
+    font-size: 0.9rem;
+    padding: 0 3px;
+  }
 }
 
 /* Container */
