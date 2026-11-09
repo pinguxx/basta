@@ -286,6 +286,80 @@ body {
   }
 }
 
+/* 🔌 Live Server Connection Status Badge */
+.header-connection-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  user-select: none;
+  transition: all 0.25s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.header-connection-badge .connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.header-connection-badge.badge-online {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1.5px solid #10b981;
+  color: #047857;
+}
+
+[data-theme="feria"] .header-connection-badge.badge-online {
+  background: rgba(16, 185, 129, 0.2);
+  color: #065f46;
+}
+
+[data-theme="talavera"] .header-connection-badge.badge-online {
+  background: rgba(16, 185, 129, 0.15);
+  color: #065f46;
+}
+
+.header-connection-badge.badge-online .connection-dot {
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulseGreen 2s infinite;
+}
+
+.header-connection-badge.badge-connecting {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1.5px solid #3b82f6;
+  color: #1d4ed8;
+}
+
+.header-connection-badge.badge-connecting .connection-dot {
+  background: #3b82f6;
+  animation: pulseGreen 1.2s infinite;
+}
+
+.header-connection-badge.badge-offline {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1.5px solid #f59e0b;
+  color: #b45309;
+}
+
+.header-connection-badge.badge-offline .connection-dot {
+  background: #f59e0b;
+}
+
+@media (max-width: 600px) {
+  .header-connection-badge .connection-text {
+    display: none;
+  }
+  .header-connection-badge {
+    padding: 0.35rem;
+  }
+}
+
 /* 🕹️ Controls */
 .header-controls {
   display: flex;

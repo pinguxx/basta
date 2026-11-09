@@ -23,9 +23,6 @@ def bundle(target_output=None):
     dict_js = (public_dir / 'dictionary.js').read_text(encoding='utf-8')
     app_js = (public_dir / 'app.js').read_text(encoding='utf-8')
 
-    # Standalone artifact always defaults to offline self-contained engine
-    app_js = app_js.replace('let useOfflineEngine = false;', 'let useOfflineEngine = true;')
-
     # Replace stylesheet link with inline style
     html = re.sub(
         r'<link\s+rel="stylesheet"\s+href="/style\.css[^"]*"\s*/?>',

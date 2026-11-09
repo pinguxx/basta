@@ -194,7 +194,59 @@ function updateHeaderExitButton(visible) {
       btn.classList.add('hidden');
       btn.style.display = 'none';
     }
+}
+
+function updateConnectionBadge(status) {
+  const badge = document.getElementById('header-connection-badge');
+  const text = document.getElementById('connection-status-text');
+  if (!badge || !text) return;
+
+  badge.classList.remove('badge-online', 'badge-offline', 'badge-connecting');
+  if (status === true || status === 'online') {
+    badge.classList.add('badge-online');
+    text.textContent = 'Rust Online';
+    badge.title = 'Servidor Axum en vivo conectado (Rust + WebSockets)';
+  } else if (status === 'connecting') {
+    badge.classList.add('badge-connecting');
+    text.textContent = 'Conectando...';
+    badge.title = 'Conectando con el servidor en la nube...';
+  } else {
+    badge.classList.add('badge-offline');
+    text.textContent = 'Offline';
+    badge.title = 'Modo sin conexión (Simulación local)';
   }
+}
+
+function getWebSocketHost() {
+  if (window.location.host && window.location.host !== 'null' && window.location.protocol !== 'file:') {
+    return window.location.host;
+  }
+  return 'localhost:3000';
+}
+
+function getWebSocketProtocol() {
+  return window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+}
+
+function checkInitialServerStatus() {
+  updateConnectionBadge('connecting');
+  const host = getWebSocketHost();
+  const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+  const healthUrl = `${protocol}//${host}/healthz`;
+
+  fetch(healthUrl, { method: 'GET', mode: 'cors' })
+    .then(res => {
+      if (res.ok) {
+        updateConnectionBadge(true);
+      } else {
+        updateConnectionBadge(false);
+      }
+    })
+    .catch(() => {
+      if (!state.ws) {
+        updateConnectionBadge(false);
+      }
+    });
 }
 
 function confirmAndExitGame() {
@@ -330,6 +382,7 @@ function initApp() {
   bindUIEvents();
   initTheme();
   renderQuipChips();
+  checkInitialServerStatus();
 
   // Check for saved active session (prevents getting kicked out on refresh!)
   const savedSession = loadSavedSession();
@@ -687,21 +740,21 @@ function showView(viewName) {
 
 // WebSocket Connection
 function createOrJoinRoom(code) {
-  if (useOfflineEngine) {
-    offlineInitRoom(code);
-    return;
-  }
-
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.host;
+  const protocol = getWebSocketProtocol();
+  const host = getWebSocketHost();
   const playerIdParam = state.playerId ? `&player_id=${encodeURIComponent(state.playerId)}` : '';
   const wsUrl = `${protocol}//${host}/ws?room=${encodeURIComponent(code || '')}&name=${encodeURIComponent(state.playerName)}&avatar=${encodeURIComponent(state.playerAvatar)}${playerIdParam}`;
+
+  console.log('Connecting to Basta Axum server via WebSocket at:', wsUrl);
+  updateConnectionBadge('connecting');
 
   try {
     state.ws = new WebSocket(wsUrl);
 
     state.ws.onopen = () => {
-      console.log('Connected to Basta server');
+      console.log('✅ Connected to Basta Rust server via WebSocket at:', wsUrl);
+      useOfflineEngine = false;
+      updateConnectionBadge(true);
       if (state.pingInterval) clearInterval(state.pingInterval);
       state.pingInterval = setInterval(() => sendWSMessage({ type: 'ping' }), 15000);
       saveGameSession();
@@ -712,19 +765,23 @@ function createOrJoinRoom(code) {
         const msg = JSON.parse(event.data);
         handleServerMessage(msg);
       } catch (err) {
-        console.error('Error parsing message', err);
+        console.error('Error parsing server message', err);
       }
     };
 
-    state.ws.onerror = () => {
-      console.warn('WebSocket error, falling back to offline engine');
+    state.ws.onerror = (err) => {
+      console.warn('WebSocket connection to ' + wsUrl + ' failed. Falling back to offline engine.', err);
       switchToOffline();
     };
 
     state.ws.onclose = () => {
       console.log('WebSocket closed');
+      if (!useOfflineEngine) {
+        updateConnectionBadge(false);
+      }
     };
-  } catch (_) {
+  } catch (err) {
+    console.warn('Exception connecting to ' + wsUrl + ', falling back to offline engine:', err);
     switchToOffline();
   }
 }
@@ -1263,6 +1320,7 @@ function showQRModal() {
 function switchToOffline() {
   useOfflineEngine = true;
   console.log('Switched to Standalone Offline Basta Engine');
+  updateConnectionBadge(false);
   offlineInitRoom('SOLO1');
 }
 

@@ -61,6 +61,7 @@ async fn main() {
         .fallback_service(
             ServeDir::new("public").not_found_service(axum::routing::get(fallback_index_handler)),
         )
+        .layer(tower_http::cors::CorsLayer::permissive())
         .with_state(state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
@@ -136,24 +137,30 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
     let mut current_player_id = query.player_id.clone();
 
     // Auto-join if params are present in query
-    if let (Some(code), Some(name)) = (&current_room_code, &query.name) {
+    if let (Some(code_param), Some(name)) = (&current_room_code, &query.name) {
         let trimmed_name = name.trim();
         if trimmed_name.is_empty() {
             let _ = tx.send(ServerMessage::Error {
                 message: "Por favor ingresa tu nombre para jugar".to_string(),
             });
         } else {
+            let code = if code_param.trim().is_empty() {
+                generate_room_code()
+            } else {
+                code_param.trim().to_uppercase()
+            };
+            current_room_code = Some(code.clone());
             let avatar = query.avatar.clone().unwrap_or_else(|| "🤠".to_string());
             let room_opt = {
                 let mut rooms = state.rooms.write().await;
-                if !rooms.contains_key(code) {
+                if !rooms.contains_key(&code) {
                     let new_room = Arc::new(RwLock::new(Room::new(
                         code.clone(),
                         GameSettings::default(),
                     )));
                     rooms.insert(code.clone(), new_room);
                 }
-                rooms.get(code).cloned()
+                rooms.get(&code).cloned()
             };
 
             if let Some(room_arc) = room_opt {
@@ -196,7 +203,11 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
                     });
                     continue;
                 }
-                let code = current_room_code.clone().unwrap_or_else(generate_room_code);
+                let code = current_room_code
+                    .clone()
+                    .filter(|c| !c.trim().is_empty())
+                    .unwrap_or_else(generate_room_code)
+                    .to_uppercase();
                 current_room_code = Some(code.clone());
 
                 let room_arc = {
