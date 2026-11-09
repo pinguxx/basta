@@ -189,17 +189,70 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* LOBBY VIEW */
+/* WELCOME & LOBBY SCREENS (Loteria Multi-Screen Flow) */
+.welcome-card {
+  max-width: 520px;
+  margin: 0.5rem auto 2rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-md);
+  animation: fadeIn 0.25s ease-out;
+}
+
+.lobby-waiting-card {
+  max-width: 580px;
+  margin: 0.5rem auto 2rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-md);
+  animation: fadeIn 0.25s ease-out;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 1.25rem;
+  border-bottom: 2px solid var(--border-soft);
+  padding-bottom: 8px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 0.65rem 0.9rem;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, var(--accent-primary), #b91c1c);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+}
+
 .lobby-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1.5rem;
-}
-
-@media (min-width: 768px) {
-  .lobby-grid {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 
 .card {

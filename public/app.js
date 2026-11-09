@@ -95,6 +95,7 @@ const OFFLINE_DICT_EN = {
 
 // DOM References
 const views = {
+  welcome: document.getElementById('view-welcome'),
   lobby: document.getElementById('view-lobby'),
   playing: document.getElementById('view-playing'),
   review: document.getElementById('view-review'),
@@ -105,6 +106,7 @@ function initApp() {
   bindUIEvents();
   setupURLParameters();
   initTheme();
+  showView('welcome');
 }
 
 function bindUIEvents() {
@@ -169,7 +171,53 @@ function bindUIEvents() {
     inputPlayerName.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        document.getElementById('btn-create-room')?.click();
+        const tabCreate = document.getElementById('tab-create');
+        if (tabCreate && tabCreate.classList.contains('active')) {
+          document.getElementById('btn-create-room')?.click();
+        } else {
+          document.getElementById('input-room-code')?.focus();
+        }
+      }
+    });
+  }
+
+  // Welcome Tabs: Crear Sala vs Unirse a Sala
+  const tabCreate = document.getElementById('tab-create');
+  const tabJoin = document.getElementById('tab-join');
+  const panelCreate = document.getElementById('panel-create');
+  const panelJoin = document.getElementById('panel-join');
+
+  if (tabCreate && tabJoin) {
+    tabCreate.addEventListener('click', () => {
+      tabCreate.classList.add('active');
+      tabJoin.classList.remove('active');
+      if (panelCreate) panelCreate.style.display = 'block';
+      if (panelJoin) panelJoin.style.display = 'none';
+    });
+
+    tabJoin.addEventListener('click', () => {
+      tabJoin.classList.add('active');
+      tabCreate.classList.remove('active');
+      if (panelCreate) panelCreate.style.display = 'none';
+      if (panelJoin) panelJoin.style.display = 'block';
+      document.getElementById('input-room-code')?.focus();
+    });
+  }
+
+  // Room Code Input Validation
+  const inputRoomCode = document.getElementById('input-room-code');
+  if (inputRoomCode) {
+    inputRoomCode.addEventListener('input', () => {
+      if (inputRoomCode.value.trim()) {
+        inputRoomCode.classList.remove('input-error', 'shake');
+        const codeError = document.getElementById('room-code-error');
+        if (codeError) codeError.style.display = 'none';
+      }
+    });
+    inputRoomCode.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('btn-join-room')?.click();
       }
     });
   }
@@ -179,6 +227,17 @@ function bindUIEvents() {
     const name = requirePlayerName();
     if (!name) return;
     state.playerName = name;
+
+    const langSelect = document.getElementById('select-language-mode');
+    if (langSelect) state.settings.language_mode = langSelect.value;
+    const roundsSelect = document.getElementById('select-rounds-count');
+    if (roundsSelect) {
+      state.settings.rounds_count = parseInt(roundsSelect.value, 10);
+      state.totalRounds = state.settings.rounds_count;
+    }
+    const countdownSelect = document.getElementById('select-countdown');
+    if (countdownSelect) state.settings.countdown_seconds = parseInt(countdownSelect.value, 10);
+
     createOrJoinRoom(null);
   });
 
@@ -186,12 +245,24 @@ function bindUIEvents() {
   document.getElementById('btn-join-room').addEventListener('click', () => {
     const name = requirePlayerName();
     if (!name) return;
-    const code = document.getElementById('input-room-code').value.trim().toUpperCase();
+    const code = inputRoomCode ? inputRoomCode.value.trim().toUpperCase() : '';
+    const codeError = document.getElementById('room-code-error');
+
     if (!code) {
-      alert('Por favor ingresa un código de sala');
-      document.getElementById('input-room-code').focus();
+      if (inputRoomCode) {
+        inputRoomCode.classList.remove('shake');
+        void inputRoomCode.offsetWidth;
+        inputRoomCode.classList.add('input-error', 'shake');
+        inputRoomCode.focus();
+      }
+      if (codeError) codeError.style.display = 'flex';
+      if (window.soundFX && soundFX.playVoteChime) soundFX.playVoteChime(false);
       return;
     }
+
+    if (inputRoomCode) inputRoomCode.classList.remove('input-error', 'shake');
+    if (codeError) codeError.style.display = 'none';
+
     state.playerName = name;
     createOrJoinRoom(code);
   });
@@ -239,7 +310,33 @@ function bindUIEvents() {
   });
 
   // Copy Room Link
-  document.getElementById('btn-copy-link').addEventListener('click', copyRoomLink);
+  const btnCopyLink = document.getElementById('btn-copy-link');
+  if (btnCopyLink) {
+    btnCopyLink.addEventListener('click', copyRoomLink);
+  }
+
+  // Copy Room Code
+  const btnCopyCode = document.getElementById('btn-copy-code');
+  if (btnCopyCode) {
+    btnCopyCode.addEventListener('click', copyRoomCode);
+  }
+
+  // Leave Lobby
+  const btnLeaveLobby = document.getElementById('btn-leave-lobby');
+  if (btnLeaveLobby) {
+    btnLeaveLobby.addEventListener('click', () => {
+      if (confirm('¿Deseas salir de la sala de espera y volver al inicio?')) {
+        if (state.ws) {
+          state.ws.close();
+          state.ws = null;
+        }
+        state.roomCode = '';
+        state.isHost = false;
+        state.players = [];
+        showView('welcome');
+      }
+    });
+  }
 
   // Language Mode Selector
   const selectLang = document.getElementById('select-language-mode');
@@ -272,7 +369,11 @@ function setupURLParameters() {
   const params = new URLSearchParams(window.location.search);
   const room = params.get('room');
   if (room) {
-    document.getElementById('input-room-code').value = room.toUpperCase();
+    const tabJoin = document.getElementById('tab-join');
+    if (tabJoin) tabJoin.click();
+    const inputCode = document.getElementById('input-room-code');
+    if (inputCode) inputCode.value = room.toUpperCase();
+    document.getElementById('input-player-name')?.focus();
   }
 }
 
@@ -418,29 +519,52 @@ function syncState(serverState) {
 
 // Renderers
 function renderLobby() {
-  document.getElementById('lobby-room-code').textContent = state.roomCode;
-  const listEl = document.getElementById('lobby-players-list');
-  listEl.innerHTML = '';
+  const codeEl = document.getElementById('lobby-room-code');
+  if (codeEl) codeEl.textContent = state.roomCode || '------';
 
-  state.players.forEach(p => {
-    const row = document.createElement('div');
-    row.className = 'player-item';
-    row.innerHTML = `
-      <div class="player-info">
-        <span class="player-avatar">${p.avatar}</span>
-        <span class="player-name">${escapeHTML(p.name)}</span>
-        ${p.is_bot ? '<span class="player-badge">BOT</span>' : ''}
-        ${p.is_host ? '<span class="player-badge" style="background:#f59e0b">ANFITRIÓN</span>' : ''}
-      </div>
-      <div>
-        <strong>${p.total_score} pts</strong>
-      </div>
-    `;
-    listEl.appendChild(row);
-  });
+  const countEl = document.getElementById('lobby-player-count');
+  if (countEl) countEl.textContent = state.players.length;
+
+  const listEl = document.getElementById('lobby-players-list');
+  if (listEl) {
+    listEl.innerHTML = '';
+    state.players.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'player-item';
+      row.innerHTML = `
+        <div class="player-info">
+          <span class="player-avatar">${p.avatar}</span>
+          <span class="player-name">${escapeHTML(p.name)}</span>
+          ${p.is_bot ? '<span class="player-badge">BOT</span>' : ''}
+          ${p.is_host ? '<span class="player-badge" style="background:#f59e0b">ANFITRIÓN</span>' : ''}
+        </div>
+        <div>
+          <strong>${p.total_score} pts</strong>
+        </div>
+      `;
+      listEl.appendChild(row);
+    });
+  }
+
+  // Update room settings badges
+  const langLabel = document.getElementById('lobby-lang-label');
+  if (langLabel && state.settings) {
+    const mode = state.settings.language_mode;
+    langLabel.textContent = mode === 'es' ? 'Solo Español 🇲🇽' : mode === 'en' ? 'Only English 🇺🇸' : 'Español & English 🇲🇽 🇺🇸';
+  }
+  const roundsLabel = document.getElementById('lobby-rounds-label');
+  if (roundsLabel && state.settings) {
+    roundsLabel.textContent = `${state.settings.rounds_count || 5} Rondas`;
+  }
 
   const btnStart = document.getElementById('btn-start-game');
-  btnStart.style.display = state.isHost ? 'flex' : 'none';
+  if (btnStart) {
+    btnStart.style.display = state.isHost ? 'flex' : 'none';
+  }
+  const waitingHint = document.getElementById('lobby-waiting-hint');
+  if (waitingHint) {
+    waitingHint.style.display = state.isHost ? 'none' : 'block';
+  }
 }
 
 function renderActiveRound() {
@@ -784,9 +908,34 @@ function generateTrophyImage() {
 
 // QR Code and Share Links
 function copyRoomLink() {
-  const url = `${window.location.origin}${window.location.pathname}?room=${state.roomCode}`;
+  const url = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(state.roomCode)}`;
+  const btn = document.getElementById('btn-copy-link');
   navigator.clipboard.writeText(url).then(() => {
-    alert('¡Enlace de la sala copiado al portapapeles!');
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '✓ ¡Copiado!';
+      setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    } else {
+      alert('¡Enlace de la sala copiado al portapapeles!');
+    }
+  }).catch(() => {
+    prompt('Copia este enlace de sala:', url);
+  });
+}
+
+function copyRoomCode() {
+  if (!state.roomCode) return;
+  const btn = document.getElementById('btn-copy-code');
+  navigator.clipboard.writeText(state.roomCode).then(() => {
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '✓ ¡Copiado!';
+      setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    } else {
+      alert('¡Código de sala copiado al portapapeles!');
+    }
+  }).catch(() => {
+    prompt('Copia este código de sala:', state.roomCode);
   });
 }
 
