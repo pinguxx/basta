@@ -424,6 +424,11 @@ html[data-theme="talavera"] .app-header-card {
   display: block;
 }
 
+/* Active playing view bottom padding to guarantee clearance above fixed Basta bar */
+#view-playing {
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1316,7 +1321,9 @@ html[data-theme="talavera"] .category-row {
 }
 
 .quips-container.quips-bottom-playing {
-  margin: 1.25rem 0 6.5rem;
+  margin: 1.5rem 0 3.5rem;
+  position: relative;
+  z-index: 10;
 }
 
 .quips-container.quips-bottom-review {
