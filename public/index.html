@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="cuaderno">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#dc2626" />
+  <meta name="description" content="✏️ Basta Online (Stop / Tutti Frutti) • Clásico juego tradicional de palabras en Rust y WebSockets con bots mexicanos, audio procedural y votación en tiempo real." />
+  <title>Basta Online • Juego de Palabras Tradicional Mexicano</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <!-- Festive Top Strip -->
+  <div class="festive-ribbon"></div>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="logo-group">
+      <div class="logo-badge">✏️</div>
+      <div class="logo-text">
+        <h1>¡BASTA!</h1>
+        <p>Juego Tradicional de Palabras</p>
+      </div>
+    </div>
+    <div class="header-controls">
+      <span class="player-badge" id="header-room-pill" style="display:none">Sala: ----</span>
+      <button class="btn-icon" id="btn-qr-invite" title="Invitar con código QR">📱 QR</button>
+      <button class="btn-icon" id="btn-theme" title="Cambiar tema visual">🎨</button>
+      <button class="btn-icon" id="btn-audio" title="Efectos de sonido">🔊</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-content">
+    
+    <!-- LOBBY VIEW -->
+    <section class="view-panel active" id="view-lobby">
+      <div class="lobby-grid">
+        <!-- Player Setup Card -->
+        <div class="card">
+          <h2 class="card-title">👤 Tu Jugador</h2>
+          
+          <label style="font-size:0.82rem; font-weight:600; color:var(--text-muted); margin-bottom:0.4rem; display:block;">Elige tu avatar:</label>
+          <div class="avatar-selector">
+            <div class="avatar-choice selected" data-avatar="🤠">🤠</div>
+            <div class="avatar-choice" data-avatar="🧢">🧢</div>
+            <div class="avatar-choice" data-avatar="👧">👧</div>
+            <div class="avatar-choice" data-avatar="⚓">⚓</div>
+            <div class="avatar-choice" data-avatar="🎭">🎭</div>
+            <div class="avatar-choice" data-avatar="🦸‍♂️">🦸‍♂️</div>
+            <div class="avatar-choice" data-avatar="🥑">🥑</div>
+            <div class="avatar-choice" data-avatar="🌮">🌮</div>
+            <div class="avatar-choice" data-avatar="👑">👑</div>
+            <div class="avatar-choice" data-avatar="💀">💀</div>
+          </div>
+
+          <div class="form-group">
+            <label for="input-player-name">Tu Apodo o Nombre:</label>
+            <input type="text" id="input-player-name" class="input-text" placeholder="Ej. Don Ramón, Marijose..." maxlength="20" value="Jugador 1" />
+          </div>
+
+          <button id="btn-create-room" class="btn-primary" style="margin-bottom:0.75rem;">
+            ✨ Crear Nueva Sala
+          </button>
+
+          <div style="text-align:center; margin:0.6rem 0; font-size:0.85rem; color:var(--text-muted); font-weight:600;">— O UNIRTE A UNA SALA —</div>
+
+          <div class="form-group">
+            <label for="input-room-code">Código de Sala (6 letras):</label>
+            <input type="text" id="input-room-code" class="input-text" placeholder="Ej. BASTA8" style="text-transform:uppercase" maxlength="8" />
+          </div>
+
+          <button id="btn-join-room" class="btn-secondary">
+            🚪 Entrar a la Sala
+          </button>
+        </div>
+
+        <!-- Room Lobby Info Card -->
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem;">
+            <h2 class="card-title" style="margin-bottom:0">👥 Sala de Espera</h2>
+            <span class="player-badge" id="lobby-room-code" style="font-size:0.95rem; padding:0.25rem 0.6rem;">------</span>
+          </div>
+
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.75rem;">
+            Comparte el código o enlace con tus amigos para jugar juntos:
+          </p>
+
+          <button id="btn-copy-link" class="btn-secondary" style="margin-bottom:1rem; font-size:0.85rem;">
+            📋 Copiar Enlace de Invitación
+          </button>
+
+          <div style="font-size:0.85rem; font-weight:700; color:var(--text-main); margin-bottom:0.4rem;">
+            Jugadores Conectados:
+          </div>
+          <div class="players-list" id="lobby-players-list">
+            <!-- Rendered by JS -->
+          </div>
+
+          <div style="display:flex; gap:0.6rem; margin-top:1.25rem;">
+            <button id="btn-add-bot" class="btn-secondary" style="flex:1;">
+              🤖 Agregar Bot
+            </button>
+            <button id="btn-start-game" class="btn-primary" style="flex:1.5; display:none;">
+              🚀 ¡Iniciar Juego!
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ACTIVE PLAYING SHEET VIEW -->
+    <section class="view-panel" id="view-playing">
+      <!-- HUD -->
+      <div class="round-hud">
+        <div class="letter-stamp-box">
+          <div class="letter-stamp" id="hud-letter-stamp">A</div>
+          <div class="round-info">
+            <h2 id="hud-round-label">Ronda 1 de 5</h2>
+            <p>Escribe una palabra que inicie con esta letra</p>
+          </div>
+        </div>
+        <div class="timer-box">
+          <div class="timer-display" id="hud-timer-display">--:--</div>
+          <small style="color:var(--text-muted); font-size:0.72rem;">TIEMPO RESTANTE</small>
+        </div>
+      </div>
+
+      <div id="basta-alert-banner" class="hidden" style="background:#dc2626; color:#fff; text-align:center; padding:0.6rem; border-radius:8px; font-weight:800; margin-bottom:1rem; animation:urgentBlink 0.5s infinite alternate;"></div>
+
+      <!-- Ruled Notebook Sheet -->
+      <div class="notebook-sheet">
+        <div class="notebook-fields" id="notebook-fields-container">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Floating Basta Action Button -->
+      <div class="floating-basta-bar">
+        <button id="btn-basta-action" class="btn-basta-shout">
+          ✏️ ¡¡BASTA!! (0/8)
+        </button>
+      </div>
+    </section>
+
+    <!-- REVIEW & VOTING VIEW -->
+    <section class="view-panel" id="view-review">
+      <div class="review-header">
+        <h2 id="review-round-title">Mesa de Calificación</h2>
+        <p style="color:var(--text-muted); font-size:0.9rem;">
+          Revisa las respuestas de todos los jugadores y vota si alguna palabra es inventada:
+        </p>
+        <div class="review-caller-badge" id="review-caller-name"></div>
+      </div>
+
+      <div class="review-grid" id="review-grid-container">
+        <!-- Rendered by JS -->
+      </div>
+
+      <div style="margin-top:2rem; max-width:400px; margin-left:auto; margin-right:auto;">
+        <button id="btn-next-round" class="btn-primary" style="display:none;">
+          Siguiente Ronda ➔
+        </button>
+      </div>
+    </section>
+
+    <!-- GAME OVER & PODIUM VIEW -->
+    <section class="view-panel" id="view-gameover">
+      <div style="text-align:center; margin-bottom:1.5rem;">
+        <h2 style="font-size:2rem; font-weight:900;">🏆 ¡Fin de la Partida!</h2>
+        <p style="color:var(--text-muted);">¡Lápiz quieto y cuaderno cerrado! He aquí a los ganadores:</p>
+      </div>
+
+      <div id="podium-view-container">
+        <!-- Rendered by JS -->
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:0.75rem; max-width:400px; margin:2rem auto 0;">
+        <button id="btn-download-trophy" class="btn-primary">
+          📸 Descargar Tarjeta de Trofeo
+        </button>
+        <button id="btn-restart-game" class="btn-secondary" style="display:none;">
+          🔄 Jugar Nueva Partida
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- QR Invite Modal -->
+  <div class="modal-overlay hidden" id="modal-qr">
+    <div class="modal-card">
+      <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:0.4rem;">📱 Invitar Amigos</h3>
+      <p style="font-size:0.85rem; color:var(--text-muted);">Escanea este código QR con la cámara de tu celular para unirte a la sala:</p>
+      <div class="qr-frame" id="qr-code-canvas-container"></div>
+      <button class="btn-secondary" id="btn-close-qr" style="margin-top:0.5rem;">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/qrcode.min.js"></script>
+  <script src="/audio.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

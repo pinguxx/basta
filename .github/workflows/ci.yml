@@ -1,0 +1,70 @@
+name: Basta Mexicano Production CI/CD & Quality Gates
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-quality:
+    name: Rust Backend Quality, Tests & Formatting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cargo Format Check
+        run: cargo fmt -- --check
+
+      - name: Cargo Check
+        run: cargo check --all-targets
+
+      - name: Cargo Clippy Linter
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Cargo Test Suite
+        run: cargo test --all-targets --verbose
+
+      - name: Build Release Binary
+        run: cargo build --release
+
+  frontend-quality:
+    name: Frontend Syntax Check & Standalone Bundler
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate JavaScript Syntax
+        run: |
+          node -c public/app.js
+          node -c public/audio.js
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Test Standalone Artifact Bundler
+        run: |
+          python3 bundle_standalone.py dist/basta_standalone.html
+          test -f dist/basta_standalone.html
+          echo "Standalone artifact bundle generated successfully!"

@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: basta
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT
+        value: 3000

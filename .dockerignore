@@ -1,0 +1,7 @@
+target/
+.git/
+.github/
+dist/
+*.md
+LICENSE
+bundle_standalone.py
