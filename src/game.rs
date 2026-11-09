@@ -66,6 +66,34 @@ impl Room {
         player_id
     }
 
+    pub fn reconnect_or_add_player(
+        &mut self,
+        existing_id: Option<&str>,
+        player_name: String,
+        avatar: String,
+    ) -> String {
+        if let Some(pid) = existing_id {
+            if let Some(player) = self.players.iter_mut().find(|p| p.id == pid) {
+                player.connected = true;
+                player.name = player_name;
+                player.avatar = avatar;
+                return pid.to_string();
+            }
+        }
+
+        if let Some(player) = self
+            .players
+            .iter_mut()
+            .find(|p| p.name == player_name && !p.is_bot && !p.connected)
+        {
+            player.connected = true;
+            player.avatar = avatar;
+            return player.id.clone();
+        }
+
+        self.add_player(player_name, avatar)
+    }
+
     pub fn add_bot(&mut self, personality: Option<String>) -> Option<String> {
         if self.players.len() >= 12 {
             return None;
@@ -707,5 +735,32 @@ mod tests {
         let review = room.latest_round_review.as_ref().unwrap();
         assert_eq!(review.evaluations[&p1]["cosa_objeto"].points, 100);
         assert_eq!(review.evaluations[&p1]["cosa_objeto"].status, "valid");
+    }
+
+    #[test]
+    fn test_reconnect_preserves_player_slot_and_score() {
+        let mut room = Room::new("RECON1".to_string(), GameSettings::default());
+        let p1_id = room.add_player("Carlos".to_string(), "🤠".to_string());
+        room.players[0].total_score = 350;
+
+        // Disconnect Carlos (like closing tab or refresh)
+        room.players[0].connected = false;
+        assert_eq!(room.players.len(), 1);
+
+        // Reconnect with same player_id
+        let recon_id =
+            room.reconnect_or_add_player(Some(&p1_id), "Carlos".to_string(), "🤠".to_string());
+        assert_eq!(recon_id, p1_id);
+        assert_eq!(room.players.len(), 1);
+        assert!(room.players[0].connected);
+        assert_eq!(room.players[0].total_score, 350);
+
+        // Disconnect again and reconnect by name
+        room.players[0].connected = false;
+        let recon_name_id =
+            room.reconnect_or_add_player(None, "Carlos".to_string(), "🤠".to_string());
+        assert_eq!(recon_name_id, p1_id);
+        assert_eq!(room.players.len(), 1);
+        assert!(room.players[0].connected);
     }
 }

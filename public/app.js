@@ -24,6 +24,11 @@ const state = {
   reviewRemaining: null,
   ws: null,
   pingInterval: null,
+  botBastaTimer: null,
+  bastaCountdownInterval: null,
+  bastaEndTime: null,
+  bastaCallerName: null,
+  botBastaTargetTime: null,
   settings: {
     categories: [],
     rounds_count: 5,
@@ -102,12 +107,228 @@ const views = {
   gameover: document.getElementById('view-gameover'),
 };
 
+// ==========================================
+// SESSION PERSISTENCE & GAME EXIT (CANICAS-PROOF)
+// ==========================================
+const SESSION_STORAGE_KEY = 'basta_active_session_v1';
+
+function saveGameSession() {
+  if (!state.roomCode || !state.playerName) return;
+  const session = {
+    roomCode: state.roomCode,
+    phase: state.phase,
+    playerId: state.playerId,
+    playerName: state.playerName,
+    playerAvatar: state.playerAvatar,
+    isHost: state.isHost,
+    isOffline: useOfflineEngine,
+    currentRound: state.currentRound,
+    totalRounds: state.totalRounds,
+    currentLetter: state.currentLetter,
+    players: state.players,
+    settings: state.settings,
+    categories: state.categories,
+    answers: state.answers,
+    latestReview: state.latestReview,
+    history: state.history,
+    bastaEndTime: state.bastaEndTime || null,
+    bastaCallerName: state.bastaCallerName || null,
+    botBastaTargetTime: state.botBastaTargetTime || null,
+    timestamp: Date.now(),
+  };
+  try {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch (e) {
+    console.warn('Could not save session to localStorage', e);
+  }
+}
+
+function loadSavedSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    // Expire sessions older than 4 hours
+    if (Date.now() - (session.timestamp || 0) > 4 * 60 * 60 * 1000) {
+      clearSavedSession();
+      return null;
+    }
+    return session;
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearSavedSession() {
+  try {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch (_) {}
+}
+
+function updateHeaderExitButton(visible) {
+  const btn = document.getElementById('btn-global-exit');
+  if (btn) {
+    if (visible) {
+      btn.classList.remove('hidden');
+    } else {
+      btn.classList.add('hidden');
+    }
+  }
+}
+
+function confirmAndExitGame() {
+  const msg = state.phase === 'GameOver'
+    ? '¿Deseas salir al menú principal?'
+    : '¿Seguro que deseas salir de la partida actual? Perderás tu progreso en esta sala.';
+  if (confirm(msg)) {
+    exitGame();
+  }
+}
+
+function exitGame() {
+  // Clear offline timers
+  if (state.botBastaTimer) {
+    clearTimeout(state.botBastaTimer);
+    state.botBastaTimer = null;
+  }
+  if (state.bastaCountdownInterval) {
+    clearInterval(state.bastaCountdownInterval);
+    state.bastaCountdownInterval = null;
+  }
+  if (state.pingInterval) {
+    clearInterval(state.pingInterval);
+    state.pingInterval = null;
+  }
+
+  // Notify server if online
+  if (!useOfflineEngine && state.ws && state.ws.readyState === WebSocket.OPEN) {
+    sendWSMessage({
+      type: 'leave_room',
+      player_id: state.playerId || '',
+    });
+    try {
+      state.ws.close();
+    } catch (_) {}
+  }
+  state.ws = null;
+
+  // Clear session storage
+  clearSavedSession();
+
+  // Reset state
+  state.roomCode = '';
+  state.phase = 'Lobby';
+  state.isHost = false;
+  state.players = [];
+  state.answers = {};
+  state.currentRound = 0;
+  state.currentLetter = '';
+  state.latestReview = null;
+  state.history = [];
+  state.bastaEndTime = null;
+  state.bastaCallerName = null;
+  state.botBastaTargetTime = null;
+  useOfflineEngine = false;
+
+  // Reset URL query parameters without reloading
+  if (window.history && window.history.replaceState) {
+    const cleanUrl = window.location.origin + window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+  }
+
+  // Hide header exit button and return to welcome view
+  updateHeaderExitButton(false);
+  const pill = document.getElementById('header-room-pill');
+  if (pill) pill.textContent = '¡Basta!';
+  showView('welcome');
+}
+
+function restoreGameSession(savedSession) {
+  state.roomCode = savedSession.roomCode;
+  state.playerName = savedSession.playerName;
+  state.playerAvatar = savedSession.playerAvatar || '🤠';
+  state.playerId = savedSession.playerId || null;
+  state.isHost = !!savedSession.isHost;
+  state.answers = savedSession.answers || {};
+  state.settings = savedSession.settings || state.settings;
+  state.categories = savedSession.categories || DEFAULT_CATEGORIES;
+  state.currentRound = savedSession.currentRound || 1;
+  state.totalRounds = savedSession.totalRounds || 5;
+  state.currentLetter = savedSession.currentLetter || '';
+  state.players = savedSession.players || [];
+  state.latestReview = savedSession.latestReview || null;
+  state.history = savedSession.history || [];
+
+  // Update room pill
+  const pill = document.getElementById('header-room-pill');
+  if (pill) pill.textContent = `Sala: ${state.roomCode}`;
+
+  updateHeaderExitButton(true);
+
+  if (savedSession.isOffline || useOfflineEngine) {
+    useOfflineEngine = true;
+    state.phase = savedSession.phase || 'Lobby';
+    switch (state.phase) {
+      case 'Lobby':
+        renderLobby();
+        showView('lobby');
+        break;
+      case 'Playing':
+        renderActiveRound();
+        showView('playing');
+        armOfflineBotTimer(savedSession.botBastaTargetTime);
+        break;
+      case 'BastaCountdown':
+        renderActiveRound();
+        showView('playing');
+        const remaining = savedSession.bastaEndTime
+          ? Math.max(0, Math.ceil((savedSession.bastaEndTime - Date.now()) / 1000))
+          : 0;
+        if (remaining > 0) {
+          resumeOfflineBastaCountdown(remaining, savedSession.bastaCallerName || 'Alguien');
+        } else {
+          offlineTriggerReview(savedSession.bastaCallerName || 'Alguien');
+        }
+        break;
+      case 'Reviewing':
+        renderReview();
+        showView('review');
+        break;
+      case 'GameOver':
+        renderGameOver();
+        showView('gameover');
+        break;
+      default:
+        showView('welcome');
+        break;
+    }
+  } else {
+    // Online session: connect to WS room preserving player_id
+    createOrJoinRoom(state.roomCode);
+  }
+}
+
 function initApp() {
   bindUIEvents();
-  setupURLParameters();
   initTheme();
   renderQuipChips();
-  showView('welcome');
+
+  // Check for saved active session (prevents getting kicked out on refresh!)
+  const savedSession = loadSavedSession();
+  const params = new URLSearchParams(window.location.search);
+  const urlRoom = params.get('room');
+
+  if (urlRoom && savedSession && savedSession.roomCode && urlRoom.toUpperCase() !== savedSession.roomCode.toUpperCase()) {
+    clearSavedSession();
+    setupURLParameters();
+    showView('welcome');
+  } else if (savedSession && savedSession.roomCode && savedSession.playerName) {
+    console.log('Restoring existing game session:', savedSession.roomCode, savedSession.phase);
+    restoreGameSession(savedSession);
+  } else {
+    setupURLParameters();
+    showView('welcome');
+  }
 }
 
 function bindUIEvents() {
@@ -322,21 +543,30 @@ function bindUIEvents() {
     btnCopyCode.addEventListener('click', copyRoomCode);
   }
 
-  // Leave Lobby
+  // Exit Game Buttons (Lobby, Header, Playing, Review, GameOver)
   const btnLeaveLobby = document.getElementById('btn-leave-lobby');
   if (btnLeaveLobby) {
-    btnLeaveLobby.addEventListener('click', () => {
-      if (confirm('¿Deseas salir de la sala de espera y volver al inicio?')) {
-        if (state.ws) {
-          state.ws.close();
-          state.ws = null;
-        }
-        state.roomCode = '';
-        state.isHost = false;
-        state.players = [];
-        showView('welcome');
-      }
-    });
+    btnLeaveLobby.addEventListener('click', confirmAndExitGame);
+  }
+
+  const btnGlobalExit = document.getElementById('btn-global-exit');
+  if (btnGlobalExit) {
+    btnGlobalExit.addEventListener('click', confirmAndExitGame);
+  }
+
+  const btnExitPlaying = document.getElementById('btn-exit-playing');
+  if (btnExitPlaying) {
+    btnExitPlaying.addEventListener('click', confirmAndExitGame);
+  }
+
+  const btnExitReview = document.getElementById('btn-exit-review');
+  if (btnExitReview) {
+    btnExitReview.addEventListener('click', confirmAndExitGame);
+  }
+
+  const btnExitGameOver = document.getElementById('btn-exit-gameover');
+  if (btnExitGameOver) {
+    btnExitGameOver.addEventListener('click', confirmAndExitGame);
   }
 
   // Language Mode Selector
@@ -396,9 +626,15 @@ function toggleTheme() {
 
 // Switch UI Views
 function showView(viewName) {
-  Object.values(views).forEach(v => v.classList.remove('active'));
+  Object.values(views).forEach(v => {
+    if (v) v.classList.remove('active');
+  });
   if (views[viewName]) {
     views[viewName].classList.add('active');
+  }
+  updateHeaderExitButton(viewName !== 'welcome');
+  if (viewName !== 'welcome') {
+    saveGameSession();
   }
 }
 
@@ -411,7 +647,8 @@ function createOrJoinRoom(code) {
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
-  const wsUrl = `${protocol}//${host}/ws?room=${encodeURIComponent(code || '')}&name=${encodeURIComponent(state.playerName)}&avatar=${encodeURIComponent(state.playerAvatar)}`;
+  const playerIdParam = state.playerId ? `&player_id=${encodeURIComponent(state.playerId)}` : '';
+  const wsUrl = `${protocol}//${host}/ws?room=${encodeURIComponent(code || '')}&name=${encodeURIComponent(state.playerName)}&avatar=${encodeURIComponent(state.playerAvatar)}${playerIdParam}`;
 
   try {
     state.ws = new WebSocket(wsUrl);
@@ -420,6 +657,7 @@ function createOrJoinRoom(code) {
       console.log('Connected to Basta server');
       if (state.pingInterval) clearInterval(state.pingInterval);
       state.pingInterval = setInterval(() => sendWSMessage({ type: 'ping' }), 15000);
+      saveGameSession();
     };
 
     state.ws.onmessage = (event) => {
@@ -487,11 +725,18 @@ function syncState(serverState) {
     state.settings = serverState.settings;
   }
 
-  // Determine host status
-  const me = state.players.find(p => p.name === state.playerName && !p.is_bot);
+  // Determine host status and match player slot
+  const me = state.players.find(p => (state.playerId && p.id === state.playerId) || (p.name === state.playerName && !p.is_bot));
   if (me) {
     state.playerId = me.id;
     state.isHost = me.is_host;
+    if (me.current_answers) {
+      for (const [catId, word] of Object.entries(me.current_answers)) {
+        if (!state.answers[catId] && word) {
+          state.answers[catId] = word;
+        }
+      }
+    }
   }
 
   // Update Language Mode selector
@@ -503,6 +748,8 @@ function syncState(serverState) {
 
   // Update Room Header
   document.getElementById('header-room-pill').textContent = `Sala: ${state.roomCode}`;
+  updateHeaderExitButton(true);
+  saveGameSession();
 
   // Update UI according to Phase
   switch (state.phase) {
@@ -635,6 +882,7 @@ function renderActiveRound() {
       }
 
       checkBastaButtonState();
+      saveGameSession();
     });
 
     input.addEventListener('focus', () => {
@@ -1014,6 +1262,7 @@ function offlineInitRoom(code) {
   state.categories = DEFAULT_CATEGORIES;
   renderLobby();
   showView('lobby');
+  saveGameSession();
 }
 
 function offlineAddBot() {
@@ -1030,6 +1279,7 @@ function offlineAddBot() {
       total_score: 0,
     });
     renderLobby();
+    saveGameSession();
   }
 }
 
@@ -1040,30 +1290,52 @@ function offlineStartGame() {
   offlineStartRound();
 }
 
-function offlineStartRound() {
-  const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'M', 'P', 'R', 'S', 'T'];
-  state.currentLetter = letters[Math.floor(Math.random() * letters.length)];
-  state.phase = 'Playing';
-  state.answers = {};
-  renderActiveRound();
-  showView('playing');
-
-  // Bots wait 45 to 65 seconds before calling Basta, giving human players ample time!
+function armOfflineBotTimer(targetTime) {
   if (state.botBastaTimer) clearTimeout(state.botBastaTimer);
-  const botDelay = 45000 + Math.floor(Math.random() * 20000);
+  const now = Date.now();
+  let delay;
+  if (targetTime && targetTime > now) {
+    delay = targetTime - now;
+  } else if (targetTime && targetTime <= now) {
+    delay = 1000;
+  } else {
+    // Bots wait 45 to 65 seconds before calling Basta, giving human players ample time!
+    delay = 45000 + Math.floor(Math.random() * 20000);
+    state.botBastaTargetTime = now + delay;
+  }
+
   state.botBastaTimer = setTimeout(() => {
     if (state.phase === 'Playing') {
       const bots = state.players.filter(p => p.is_bot);
       const caller = bots.length > 0 ? bots[Math.floor(Math.random() * bots.length)].name : '🤖 El Chavo';
       offlineCallBasta(caller);
     }
-  }, botDelay);
+  }, delay);
+}
+
+function offlineStartRound() {
+  const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'M', 'P', 'R', 'S', 'T'];
+  state.currentLetter = letters[Math.floor(Math.random() * letters.length)];
+  state.phase = 'Playing';
+  state.answers = {};
+  state.bastaEndTime = null;
+  state.bastaCallerName = null;
+  renderActiveRound();
+  showView('playing');
+
+  armOfflineBotTimer();
+  saveGameSession();
 }
 
 function offlineCallBasta(callerName = 'Tú') {
   if (state.phase !== 'Playing') return;
-  if (state.botBastaTimer) clearTimeout(state.botBastaTimer);
+  if (state.botBastaTimer) {
+    clearTimeout(state.botBastaTimer);
+    state.botBastaTimer = null;
+  }
   state.phase = 'BastaCountdown';
+  state.bastaCallerName = callerName;
+  state.bastaEndTime = Date.now() + 10000;
   window.soundFX.playBastaAlarm();
   showBastaNotification(callerName);
 
@@ -1077,14 +1349,23 @@ function offlineCallBasta(callerName = 'Tú') {
     triggerBotQuipReaction();
   }
 
-  let seconds = 10;
+  saveGameSession();
+  resumeOfflineBastaCountdown(10, callerName);
+}
+
+function resumeOfflineBastaCountdown(totalSeconds, callerName) {
+  if (state.bastaCountdownInterval) {
+    clearInterval(state.bastaCountdownInterval);
+  }
+  let seconds = totalSeconds;
   updateTimerDisplay(seconds, 'BastaCountdown');
-  const timer = setInterval(() => {
+  state.bastaCountdownInterval = setInterval(() => {
     seconds--;
     updateTimerDisplay(seconds, 'BastaCountdown');
     if (seconds <= 0) {
-      clearInterval(timer);
-      offlineTriggerReview(callerName);
+      clearInterval(state.bastaCountdownInterval);
+      state.bastaCountdownInterval = null;
+      offlineTriggerReview(callerName || state.bastaCallerName || 'Tú');
     }
   }, 1000);
 }
@@ -1348,7 +1629,13 @@ function validateWordClient(categoryId, rawWord, letter, langMode = 'both') {
 }
 
 function offlineTriggerReview(callerName) {
+  if (state.bastaCountdownInterval) {
+    clearInterval(state.bastaCountdownInterval);
+    state.bastaCountdownInterval = null;
+  }
   state.phase = 'Reviewing';
+  state.bastaEndTime = null;
+  state.bastaCallerName = null;
   const evaluations = {};
   const langMode = state.settings?.language_mode || 'both';
 
@@ -1473,6 +1760,7 @@ function offlineTriggerReview(callerName) {
 
   renderReview();
   showView('review');
+  saveGameSession();
 }
 
 function offlineVote(targetPlayerId, categoryId, approve) {
@@ -1496,6 +1784,7 @@ function offlineVote(targetPlayerId, categoryId, approve) {
   });
 
   renderReview();
+  saveGameSession();
 }
 
 function offlineNextRound() {
@@ -1509,6 +1798,7 @@ function offlineNextRound() {
     state.phase = 'GameOver';
     renderGameOver();
     showView('gameover');
+    saveGameSession();
   } else {
     state.currentRound++;
     offlineStartRound();
@@ -1521,6 +1811,7 @@ function offlineRestart() {
   state.players.forEach(p => p.total_score = 0);
   renderLobby();
   showView('lobby');
+  saveGameSession();
 }
 
 // Helpers

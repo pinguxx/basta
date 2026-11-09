@@ -166,13 +166,20 @@ pub struct RoomStateView {
 #[serde(tag = "type")]
 pub enum ClientMessage {
     #[serde(rename = "join")]
-    Join { player_name: String, avatar: String },
+    Join {
+        player_name: String,
+        avatar: String,
+        #[serde(default)]
+        player_id: Option<String>,
+    },
     #[serde(rename = "update_settings")]
     UpdateSettings { settings: GameSettings },
     #[serde(rename = "add_bot")]
     AddBot { personality: Option<String> },
     #[serde(rename = "remove_player")]
     RemovePlayer { player_id: String },
+    #[serde(rename = "leave_room")]
+    LeaveRoom { player_id: String },
     #[serde(rename = "start_game")]
     StartGame,
     #[serde(rename = "submit_field")]

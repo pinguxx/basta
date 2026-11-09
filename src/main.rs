@@ -158,7 +158,11 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
 
             if let Some(room_arc) = room_opt {
                 let mut room = room_arc.write().await;
-                let pid = room.add_player(trimmed_name.to_string(), avatar);
+                let pid = room.reconnect_or_add_player(
+                    query.player_id.as_deref(),
+                    trimmed_name.to_string(),
+                    avatar,
+                );
                 room.subscribers.insert(pid.clone(), tx.clone());
                 current_player_id = Some(pid);
                 room.broadcast_state();
@@ -183,6 +187,7 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
             ClientMessage::Join {
                 player_name,
                 avatar,
+                player_id,
             } => {
                 let trimmed = player_name.trim();
                 if trimmed.is_empty() {
@@ -208,7 +213,8 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
                 };
 
                 let mut room = room_arc.write().await;
-                let pid = room.add_player(trimmed.to_string(), avatar);
+                let pid =
+                    room.reconnect_or_add_player(player_id.as_deref(), trimmed.to_string(), avatar);
                 room.subscribers.insert(pid.clone(), tx.clone());
                 current_player_id = Some(pid);
                 room.broadcast_state();
@@ -233,7 +239,7 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
                     }
                 }
             }
-            ClientMessage::RemovePlayer { player_id } => {
+            ClientMessage::LeaveRoom { player_id } | ClientMessage::RemovePlayer { player_id } => {
                 if let Some(code) = &current_room_code {
                     let rooms = state.rooms.read().await;
                     if let Some(room_arc) = rooms.get(code) {
