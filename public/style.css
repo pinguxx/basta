@@ -277,6 +277,32 @@ body {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
+.input-text.input-error {
+  border-color: var(--accent-primary, #dc2626) !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.25) !important;
+}
+
+.input-error-msg {
+  color: var(--accent-primary, #dc2626);
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes inputShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.shake {
+  animation: inputShake 0.35s ease;
+}
+
 .btn-primary {
   width: 100%;
   padding: 0.8rem;

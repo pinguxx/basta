@@ -137,25 +137,32 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
 
     // Auto-join if params are present in query
     if let (Some(code), Some(name)) = (&current_room_code, &query.name) {
-        let avatar = query.avatar.clone().unwrap_or_else(|| "🤠".to_string());
-        let room_opt = {
-            let mut rooms = state.rooms.write().await;
-            if !rooms.contains_key(code) {
-                let new_room = Arc::new(RwLock::new(Room::new(
-                    code.clone(),
-                    GameSettings::default(),
-                )));
-                rooms.insert(code.clone(), new_room);
-            }
-            rooms.get(code).cloned()
-        };
+        let trimmed_name = name.trim();
+        if trimmed_name.is_empty() {
+            let _ = tx.send(ServerMessage::Error {
+                message: "Por favor ingresa tu nombre para jugar".to_string(),
+            });
+        } else {
+            let avatar = query.avatar.clone().unwrap_or_else(|| "🤠".to_string());
+            let room_opt = {
+                let mut rooms = state.rooms.write().await;
+                if !rooms.contains_key(code) {
+                    let new_room = Arc::new(RwLock::new(Room::new(
+                        code.clone(),
+                        GameSettings::default(),
+                    )));
+                    rooms.insert(code.clone(), new_room);
+                }
+                rooms.get(code).cloned()
+            };
 
-        if let Some(room_arc) = room_opt {
-            let mut room = room_arc.write().await;
-            let pid = room.add_player(name.clone(), avatar);
-            room.subscribers.insert(pid.clone(), tx.clone());
-            current_player_id = Some(pid);
-            room.broadcast_state();
+            if let Some(room_arc) = room_opt {
+                let mut room = room_arc.write().await;
+                let pid = room.add_player(trimmed_name.to_string(), avatar);
+                room.subscribers.insert(pid.clone(), tx.clone());
+                current_player_id = Some(pid);
+                room.broadcast_state();
+            }
         }
     }
 
@@ -177,6 +184,13 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
                 player_name,
                 avatar,
             } => {
+                let trimmed = player_name.trim();
+                if trimmed.is_empty() {
+                    let _ = tx.send(ServerMessage::Error {
+                        message: "Por favor ingresa tu nombre para jugar".to_string(),
+                    });
+                    continue;
+                }
                 let code = current_room_code.clone().unwrap_or_else(generate_room_code);
                 current_room_code = Some(code.clone());
 
@@ -194,7 +208,7 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
                 };
 
                 let mut room = room_arc.write().await;
-                let pid = room.add_player(player_name, avatar);
+                let pid = room.add_player(trimmed.to_string(), avatar);
                 room.subscribers.insert(pid.clone(), tx.clone());
                 current_player_id = Some(pid);
                 room.broadcast_state();

@@ -127,19 +127,69 @@ function bindUIEvents() {
     });
   });
 
+  function requirePlayerName() {
+    const input = document.getElementById('input-player-name');
+    const errorEl = document.getElementById('player-name-error');
+    const name = input ? input.value.trim() : '';
+
+    if (!name) {
+      if (input) {
+        input.classList.remove('shake');
+        void input.offsetWidth; // trigger reflow
+        input.classList.add('input-error', 'shake');
+        input.focus();
+      }
+      if (errorEl) {
+        errorEl.style.display = 'flex';
+      }
+      if (window.soundFX && soundFX.playVoteChime) {
+        soundFX.playVoteChime(false);
+      }
+      return null;
+    }
+
+    if (input) {
+      input.classList.remove('input-error', 'shake');
+    }
+    if (errorEl) {
+      errorEl.style.display = 'none';
+    }
+    return name;
+  }
+
+  const inputPlayerName = document.getElementById('input-player-name');
+  if (inputPlayerName) {
+    inputPlayerName.addEventListener('input', () => {
+      if (inputPlayerName.value.trim()) {
+        inputPlayerName.classList.remove('input-error', 'shake');
+        const errorEl = document.getElementById('player-name-error');
+        if (errorEl) errorEl.style.display = 'none';
+      }
+    });
+    inputPlayerName.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('btn-create-room')?.click();
+      }
+    });
+  }
+
   // Create Room
   document.getElementById('btn-create-room').addEventListener('click', () => {
-    const name = document.getElementById('input-player-name').value.trim() || 'Jugador 1';
+    const name = requirePlayerName();
+    if (!name) return;
     state.playerName = name;
     createOrJoinRoom(null);
   });
 
   // Join Room
   document.getElementById('btn-join-room').addEventListener('click', () => {
-    const name = document.getElementById('input-player-name').value.trim() || 'Invitado';
+    const name = requirePlayerName();
+    if (!name) return;
     const code = document.getElementById('input-room-code').value.trim().toUpperCase();
     if (!code) {
       alert('Por favor ingresa un código de sala');
+      document.getElementById('input-room-code').focus();
       return;
     }
     state.playerName = name;

@@ -54,8 +54,11 @@
           </div>
 
           <div class="form-group">
-            <label for="input-player-name">Tu Apodo o Nombre:</label>
-            <input type="text" id="input-player-name" class="input-text" placeholder="Ej. Don Ramón, Marijose..." maxlength="20" value="Jugador 1" />
+            <label for="input-player-name">Tu Apodo o Nombre: <span style="color:var(--accent-primary); font-weight:bold;">*</span></label>
+            <input type="text" id="input-player-name" class="input-text" placeholder="Escribe tu apodo o nombre aquí..." maxlength="20" autocomplete="nickname" />
+            <div id="player-name-error" class="input-error-msg" style="display:none;">
+              ⚠️ ¡Por favor escribe tu apodo o nombre para jugar!
+            </div>
           </div>
 
           <button id="btn-create-room" class="btn-primary" style="margin-bottom:0.75rem;">
