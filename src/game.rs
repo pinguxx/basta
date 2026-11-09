@@ -647,4 +647,65 @@ mod tests {
         assert_eq!(review.evaluations[&p1]["cosa_objeto"].points, 0);
         assert_eq!(review.evaluations[&p1]["cosa_objeto"].status, "invalid");
     }
+
+    #[test]
+    fn test_cobija_and_expanded_vocabulary() {
+        use crate::dictionary::Dictionary;
+        use crate::models::LanguageMode;
+
+        // "cobija" and "cobijas" in Spanish cosa_objeto must be valid!
+        assert!(Dictionary::is_valid_word(
+            "cosa_objeto",
+            "cobija",
+            'C',
+            &LanguageMode::Spanish
+        ));
+        assert!(Dictionary::is_valid_word(
+            "cosa_objeto",
+            "cobijas",
+            'C',
+            &LanguageMode::Spanish
+        ));
+        assert!(Dictionary::is_valid_word(
+            "cosa_objeto",
+            "cobertor",
+            'C',
+            &LanguageMode::Spanish
+        ));
+        assert!(Dictionary::is_valid_word(
+            "cosa_objeto",
+            "colchón",
+            'C',
+            &LanguageMode::Spanish
+        ));
+        assert!(Dictionary::is_valid_word(
+            "cosa_objeto",
+            "colchon",
+            'C',
+            &LanguageMode::Spanish
+        ));
+        assert!(Dictionary::is_valid_word(
+            "cosa_objeto",
+            "almohada",
+            'A',
+            &LanguageMode::Spanish
+        ));
+
+        // In game room:
+        let settings = GameSettings {
+            language_mode: LanguageMode::Spanish,
+            ..GameSettings::default()
+        };
+        let mut room = Room::new("BASTA6".to_string(), settings);
+        let p1 = room.add_player("P1".to_string(), "🤠".to_string());
+        room.start_game().unwrap();
+        room.current_letter = Some('C');
+        room.submit_field(&p1, "cosa_objeto", "cobija");
+        room.call_basta(&p1).unwrap();
+        room.trigger_review();
+
+        let review = room.latest_round_review.as_ref().unwrap();
+        assert_eq!(review.evaluations[&p1]["cosa_objeto"].points, 100);
+        assert_eq!(review.evaluations[&p1]["cosa_objeto"].status, "valid");
+    }
 }
