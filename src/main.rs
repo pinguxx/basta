@@ -86,10 +86,10 @@ async fn fallback_index_handler() -> impl IntoResponse {
 
 async fn create_room_handler(
     State(state): State<AppState>,
-    Json(settings): Json<Option<GameSettings>>,
+    body: Option<Json<GameSettings>>,
 ) -> Json<serde_json::Value> {
     let room_code = generate_room_code();
-    let game_settings = settings.unwrap_or_default();
+    let game_settings = body.map(|b| b.0).unwrap_or_default();
     let room = Arc::new(RwLock::new(Room::new(room_code.clone(), game_settings)));
 
     let mut rooms = state.rooms.write().await;

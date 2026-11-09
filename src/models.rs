@@ -64,6 +64,7 @@ pub fn default_categories() -> Vec<Category> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct GameSettings {
     pub categories: Vec<Category>,
     pub rounds_count: u32,
