@@ -157,9 +157,10 @@ impl Room {
 
         // Generate bot answers in background
         let cats = self.settings.categories.clone();
+        let lang_mode = self.settings.language_mode.clone();
         for p in &mut self.players {
             if p.is_bot {
-                p.current_answers = generate_bot_answers(letter, &cats);
+                p.current_answers = generate_bot_answers(letter, &cats, &lang_mode);
             }
         }
     }
@@ -238,16 +239,20 @@ impl Room {
                 player_answers.push((p.id.clone(), raw, norm));
             }
 
-            // Count occurrences of valid words
+            // Count occurrences of words starting with the letter
             let mut word_counts: HashMap<String, usize> = HashMap::new();
             let mut valid_player_count = 0;
 
             for (_pid, raw, norm) in &player_answers {
                 if !norm.is_empty() && starts_with_letter(raw, letter) {
-                    let is_dict = Dictionary::is_valid_word(cat_id, raw, letter);
-                    // If it starts with letter and is either in dict or custom category
+                    *word_counts.entry(norm.clone()).or_insert(0) += 1;
+                    let is_dict = Dictionary::is_valid_word(
+                        cat_id,
+                        raw,
+                        letter,
+                        &self.settings.language_mode,
+                    );
                     if is_dict || cat_id.starts_with("custom_") {
-                        *word_counts.entry(norm.clone()).or_insert(0) += 1;
                         valid_player_count += 1;
                     }
                 }
@@ -257,27 +262,36 @@ impl Room {
             for (pid, raw, norm) in player_answers {
                 let has_word = !norm.is_empty();
                 let matches_letter = has_word && starts_with_letter(&raw, letter);
-                let in_dict = has_word && Dictionary::is_valid_word(cat_id, &raw, letter);
+                let in_dict = has_word
+                    && Dictionary::is_valid_word(
+                        cat_id,
+                        &raw,
+                        letter,
+                        &self.settings.language_mode,
+                    );
+                let count = if has_word && matches_letter {
+                    *word_counts.get(&norm).unwrap_or(&1)
+                } else {
+                    1
+                };
 
                 let (mut status, mut points) = if !has_word {
                     ("empty".to_string(), 0)
                 } else if !matches_letter {
                     ("wrong_letter".to_string(), 0)
+                } else if count > 1 {
+                    // Repeated words across players always receive a lower score (50 pts)
+                    ("duplicate".to_string(), 50)
                 } else if !in_dict && !cat_id.starts_with("custom_") {
                     // For custom categories or disputed words, start provisional
                     ("disputed".to_string(), 100)
+                } else if valid_player_count == 1
+                    && self.players.len() > 1
+                    && self.settings.bonus_sole_answer
+                {
+                    ("sole_survivor".to_string(), 200)
                 } else {
-                    let count = *word_counts.get(&norm).unwrap_or(&1);
-                    if count > 1 {
-                        ("duplicate".to_string(), 50)
-                    } else if valid_player_count == 1
-                        && self.players.len() > 1
-                        && self.settings.bonus_sole_answer
-                    {
-                        ("sole_survivor".to_string(), 200)
-                    } else {
-                        ("valid".to_string(), 100)
-                    }
+                    ("valid".to_string(), 100)
                 };
 
                 // Preserve existing approvals if any
@@ -471,5 +485,47 @@ mod tests {
 
         room.finish_round_and_next();
         assert_eq!(room.current_round, 2);
+    }
+
+    #[test]
+    fn test_repeated_word_lower_score_and_bilingual_dictionary() {
+        let settings = GameSettings {
+            language_mode: crate::models::LanguageMode::Both,
+            ..GameSettings::default()
+        };
+        let mut room = Room::new("BASTA3".to_string(), settings);
+
+        let p1 = room.add_player("Alice".to_string(), "👩".to_string());
+        let p2 = room.add_player("Bob".to_string(), "👨".to_string());
+
+        assert!(room.start_game().is_ok());
+        room.current_letter = Some('A');
+
+        // Both write the exact same word "Apple" (English word, repeated!)
+        room.submit_field(&p1, "fruta_comida", "Apple");
+        room.submit_field(&p2, "fruta_comida", "Apple");
+
+        // p1 writes "Alligator" (English), p2 writes "Águila" (Spanish) - both valid, non-repeated!
+        room.submit_field(&p1, "animal", "Alligator");
+        room.submit_field(&p2, "animal", "Águila");
+
+        room.call_basta(&p1).unwrap();
+        room.trigger_review();
+
+        let review = room.latest_round_review.as_ref().unwrap();
+        let p1_evals = &review.evaluations[&p1];
+        let p2_evals = &review.evaluations[&p2];
+
+        // Repeated word "Apple" must get lower score (50 pts)!
+        assert_eq!(p1_evals["fruta_comida"].points, 50);
+        assert_eq!(p1_evals["fruta_comida"].status, "duplicate");
+        assert_eq!(p2_evals["fruta_comida"].points, 50);
+        assert_eq!(p2_evals["fruta_comida"].status, "duplicate");
+
+        // Unique English and Spanish words must get 100 pts!
+        assert_eq!(p1_evals["animal"].points, 100);
+        assert_eq!(p1_evals["animal"].status, "valid");
+        assert_eq!(p2_evals["animal"].points, 100);
+        assert_eq!(p2_evals["animal"].status, "valid");
     }
 }

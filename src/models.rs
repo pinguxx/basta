@@ -63,6 +63,16 @@ pub fn default_categories() -> Vec<Category> {
     ]
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum LanguageMode {
+    #[serde(rename = "both")]
+    Both,
+    #[serde(rename = "es")]
+    Spanish,
+    #[serde(rename = "en")]
+    English,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct GameSettings {
@@ -72,6 +82,7 @@ pub struct GameSettings {
     pub review_duration_seconds: u32,
     pub allow_difficult_letters: bool,
     pub bonus_sole_answer: bool,
+    pub language_mode: LanguageMode,
 }
 
 impl Default for GameSettings {
@@ -83,6 +94,7 @@ impl Default for GameSettings {
             review_duration_seconds: 35,
             allow_difficult_letters: false,
             bonus_sole_answer: true,
+            language_mode: LanguageMode::Both,
         }
     }
 }

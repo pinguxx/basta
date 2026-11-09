@@ -169,6 +169,7 @@ pub fn create_bot_player(
 pub fn generate_bot_answers(
     letter: char,
     categories: &[crate::models::Category],
+    lang_mode: &crate::models::LanguageMode,
 ) -> HashMap<String, String> {
     let mut answers = HashMap::new();
     let mut rng = rand::rng();
@@ -176,7 +177,7 @@ pub fn generate_bot_answers(
     for cat in categories {
         // High chance of finding valid word, occasional miss for realistic gameplay
         if rng.random_bool(0.92) {
-            if let Some(word) = Dictionary::get_bot_word(&cat.id, letter) {
+            if let Some(word) = Dictionary::get_bot_word(&cat.id, letter, lang_mode) {
                 answers.insert(cat.id.clone(), word);
             }
         }

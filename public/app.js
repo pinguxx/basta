@@ -24,6 +24,15 @@ const state = {
   reviewRemaining: null,
   ws: null,
   pingInterval: null,
+  settings: {
+    categories: [],
+    rounds_count: 5,
+    countdown_seconds: 10,
+    review_duration_seconds: 35,
+    allow_difficult_letters: false,
+    bonus_sole_answer: true,
+    language_mode: 'both',
+  },
 };
 
 // Default Mexican Categories
@@ -38,7 +47,7 @@ const DEFAULT_CATEGORIES = [
   { id: 'flor_planta', name: 'Flor o Planta', icon: '🌻', desc: 'Flor o hierba' },
 ];
 
-// Offline fallback dictionary subset
+// Offline fallback dictionary subset (Spanish)
 const OFFLINE_DICT = {
   A: { nombre: 'Alejandro', apellido: 'Álvarez', pais_ciudad: 'Argentina', animal: 'Águila', fruta_comida: 'Aguacate', cosa_objeto: 'Anillo', color: 'Amarillo', flor_planta: 'Azucena' },
   B: { nombre: 'Beatriz', apellido: 'Benítez', pais_ciudad: 'Brasil', animal: 'Ballena', fruta_comida: 'Banana', cosa_objeto: 'Botella', color: 'Blanco', flor_planta: 'Begonia' },
@@ -59,6 +68,29 @@ const OFFLINE_DICT = {
   S: { nombre: 'Sofía', apellido: 'Sánchez', pais_ciudad: 'Suiza', animal: 'Serpiente', fruta_comida: 'Sandía', cosa_objeto: 'Silla', color: 'Salmón', flor_planta: 'Salvia' },
   T: { nombre: 'Tomás', apellido: 'Torres', pais_ciudad: 'Tokio', animal: 'Tigre', fruta_comida: 'Taco', cosa_objeto: 'Taza', color: 'Turquesa', flor_planta: 'Tulipán' },
   V: { nombre: 'Valentina', apellido: 'Vázquez', pais_ciudad: 'Venezuela', animal: 'Vaca', fruta_comida: 'Vainilla', cosa_objeto: 'Vaso', color: 'Verde', flor_planta: 'Violeta' },
+};
+
+// Offline fallback dictionary subset (English)
+const OFFLINE_DICT_EN = {
+  A: { nombre: 'Alexander', apellido: 'Adams', pais_ciudad: 'Amsterdam', animal: 'Alligator', fruta_comida: 'Apple', cosa_objeto: 'Anchor', color: 'Amber', flor_planta: 'Azalea' },
+  B: { nombre: 'Benjamin', apellido: 'Brown', pais_ciudad: 'Boston', animal: 'Bear', fruta_comida: 'Banana', cosa_objeto: 'Bottle', color: 'Blue', flor_planta: 'Begonia' },
+  C: { nombre: 'Christopher', apellido: 'Clark', pais_ciudad: 'Chicago', animal: 'Camel', fruta_comida: 'Cherry', cosa_objeto: 'Clock', color: 'Cyan', flor_planta: 'Clover' },
+  D: { nombre: 'David', apellido: 'Davis', pais_ciudad: 'Denver', animal: 'Dolphin', fruta_comida: 'Date', cosa_objeto: 'Desk', color: 'Dark blue', flor_planta: 'Daisy' },
+  E: { nombre: 'Edward', apellido: 'Evans', pais_ciudad: 'Edinburgh', animal: 'Elephant', fruta_comida: 'Eggplant', cosa_objeto: 'Eraser', color: 'Emerald', flor_planta: 'Elderberry' },
+  F: { nombre: 'Frank', apellido: 'Fisher', pais_ciudad: 'Florence', animal: 'Falcon', fruta_comida: 'Fig', cosa_objeto: 'Fork', color: 'Fuchsia', flor_planta: 'Fern' },
+  G: { nombre: 'George', apellido: 'Garcia', pais_ciudad: 'Geneva', animal: 'Giraffe', fruta_comida: 'Grape', cosa_objeto: 'Guitar', color: 'Green', flor_planta: 'Geranium' },
+  H: { nombre: 'Henry', apellido: 'Harris', pais_ciudad: 'Houston', animal: 'Hawk', fruta_comida: 'Hazelnut', cosa_objeto: 'Hammer', color: 'Hazel', flor_planta: 'Hydrangea' },
+  I: { nombre: 'Ian', apellido: 'Ingram', pais_ciudad: 'Istanbul', animal: 'Iguana', fruta_comida: 'Ice cream', cosa_objeto: 'Iron', color: 'Indigo', flor_planta: 'Iris' },
+  J: { nombre: 'James', apellido: 'Johnson', pais_ciudad: 'Jakarta', animal: 'Jaguar', fruta_comida: 'Jam', cosa_objeto: 'Jar', color: 'Jade', flor_planta: 'Jasmine' },
+  L: { nombre: 'Lucas', apellido: 'Lewis', pais_ciudad: 'London', animal: 'Lion', fruta_comida: 'Lemon', cosa_objeto: 'Lamp', color: 'Lime', flor_planta: 'Lily' },
+  M: { nombre: 'Michael', apellido: 'Miller', pais_ciudad: 'Madrid', animal: 'Monkey', fruta_comida: 'Mango', cosa_objeto: 'Mirror', color: 'Magenta', flor_planta: 'Magnolia' },
+  N: { nombre: 'Noah', apellido: 'Nelson', pais_ciudad: 'New York', animal: 'Newt', fruta_comida: 'Nutmeg', cosa_objeto: 'Needle', color: 'Navy', flor_planta: 'Narcissus' },
+  O: { nombre: 'Oliver', apellido: 'Owens', pais_ciudad: 'Orlando', animal: 'Owl', fruta_comida: 'Orange', cosa_objeto: 'Oven', color: 'Olive', flor_planta: 'Orchid' },
+  P: { nombre: 'Peter', apellido: 'Parker', pais_ciudad: 'Paris', animal: 'Penguin', fruta_comida: 'Peach', cosa_objeto: 'Pencil', color: 'Pink', flor_planta: 'Poppy' },
+  R: { nombre: 'Robert', apellido: 'Roberts', pais_ciudad: 'Rome', animal: 'Rabbit', fruta_comida: 'Raspberry', cosa_objeto: 'Ruler', color: 'Red', flor_planta: 'Rose' },
+  S: { nombre: 'Samuel', apellido: 'Smith', pais_ciudad: 'Sydney', animal: 'Snake', fruta_comida: 'Strawberry', cosa_objeto: 'Spoon', color: 'Silver', flor_planta: 'Sunflower' },
+  T: { nombre: 'Thomas', apellido: 'Taylor', pais_ciudad: 'Toronto', animal: 'Tiger', fruta_comida: 'Tomato', cosa_objeto: 'Table', color: 'Teal', flor_planta: 'Tulip' },
+  V: { nombre: 'Victor', apellido: 'Vance', pais_ciudad: 'Vienna', animal: 'Vulture', fruta_comida: 'Vanilla', cosa_objeto: 'Vase', color: 'Violet', flor_planta: 'Verbena' },
 };
 
 // DOM References
@@ -158,6 +190,23 @@ function bindUIEvents() {
 
   // Copy Room Link
   document.getElementById('btn-copy-link').addEventListener('click', copyRoomLink);
+
+  // Language Mode Selector
+  const selectLang = document.getElementById('select-language-mode');
+  if (selectLang) {
+    selectLang.addEventListener('change', (e) => {
+      const mode = e.target.value;
+      state.settings.language_mode = mode;
+      if (useOfflineEngine) {
+        console.log('Language mode updated (offline):', mode);
+      } else if (state.isHost) {
+        sendWSMessage({
+          type: 'update_settings',
+          settings: state.settings,
+        });
+      }
+    });
+  }
 
   // QR Code Modal
   document.getElementById('btn-qr-invite').addEventListener('click', showQRModal);
@@ -274,12 +323,22 @@ function syncState(serverState) {
   state.categories = serverState.settings?.categories || DEFAULT_CATEGORIES;
   state.latestReview = serverState.latest_round_review;
   state.history = serverState.history || [];
+  if (serverState.settings) {
+    state.settings = serverState.settings;
+  }
 
   // Determine host status
   const me = state.players.find(p => p.name === state.playerName && !p.is_bot);
   if (me) {
     state.playerId = me.id;
     state.isHost = me.is_host;
+  }
+
+  // Update Language Mode selector
+  const selectLang = document.getElementById('select-language-mode');
+  if (selectLang && state.settings && state.settings.language_mode) {
+    selectLang.value = state.settings.language_mode;
+    selectLang.disabled = !state.isHost;
   }
 
   // Update Room Header
@@ -486,12 +545,21 @@ function renderReview() {
       const myVote = pEval.voters[state.playerId] || 0;
       const ptsClass = pEval.points === 200 ? 'p200' : pEval.points === 100 ? 'p100' : pEval.points === 50 ? 'p50' : 'p0';
 
+      let statusBadge = '';
+      if (pEval.status === 'duplicate') {
+        statusBadge = '<span class="status-badge duplicate" title="Palabra repetida con otro jugador">Repetida (50 pts)</span>';
+      } else if (pEval.status === 'sole_survivor') {
+        statusBadge = '<span class="status-badge sole" title="Única respuesta válida en la sala">¡Única! (+200 pts)</span>';
+      } else if (pEval.status === 'disputed') {
+        statusBadge = '<span class="status-badge disputed" title="Palabra no registrada en diccionario oficial">En votación</span>';
+      }
+
       answersHTML += `
         <div class="review-answer-row">
           <div class="player-word-box">
             <span class="player-avatar">${p.avatar}</span>
             <div>
-              <div class="review-word ${!pEval.word ? 'empty' : ''}">${pEval.word ? escapeHTML(pEval.word) : '(en blanco)'}</div>
+              <div class="review-word ${!pEval.word ? 'empty' : ''}">${pEval.word ? escapeHTML(pEval.word) : '(en blanco)'} ${statusBadge}</div>
               <small style="color:var(--text-muted)">${escapeHTML(p.name)}</small>
             </div>
           </div>
@@ -683,6 +751,15 @@ function offlineInitRoom(code) {
   state.isHost = true;
   state.phase = 'Lobby';
   state.currentRound = 0;
+  state.settings = {
+    categories: DEFAULT_CATEGORIES,
+    rounds_count: 5,
+    countdown_seconds: 10,
+    review_duration_seconds: 35,
+    allow_difficult_letters: false,
+    bonus_sole_answer: true,
+    language_mode: document.getElementById('select-language-mode')?.value || 'both',
+  };
   state.players = [
     {
       id: 'usr_me',
@@ -715,8 +792,8 @@ function offlineInitRoom(code) {
 }
 
 function offlineAddBot() {
-  const botNames = ['🤖 La Chilindrina', '🤖 Quico', '🤖 Cantinflas', '🤖 El Santo'];
-  const botAvatars = ['👧', '⚓', '🎭', '🦸‍♂️'];
+  const botNames = ['🤖 La Chilindrina', '🤖 Quico', '🤖 Bob Smith', '🤖 Cantinflas'];
+  const botAvatars = ['👧', '⚓', '🎩', '🎭'];
   const curBots = state.players.filter(p => p.is_bot).length;
   if (curBots < botNames.length) {
     state.players.push({
@@ -775,24 +852,79 @@ function offlineCallBasta(callerName = 'Tú') {
 function offlineTriggerReview(callerName) {
   state.phase = 'Reviewing';
   const evaluations = {};
+  const langMode = state.settings?.language_mode || 'both';
 
-  state.players.forEach(p => {
-    evaluations[p.id] = {};
+  // 1. Gather all words for all players
+  const playerWords = {};
+  state.players.forEach((p, idx) => {
+    playerWords[p.id] = {};
     state.categories.forEach(cat => {
       let word = '';
       if (p.is_bot) {
-        word = OFFLINE_DICT[state.currentLetter]?.[cat.id] || '';
+        const esWord = OFFLINE_DICT[state.currentLetter]?.[cat.id] || '';
+        const enWord = OFFLINE_DICT_EN[state.currentLetter]?.[cat.id] || '';
+        if (langMode === 'en') {
+          word = enWord;
+        } else if (langMode === 'es') {
+          word = esWord;
+        } else {
+          // both: alternate between ES and EN
+          word = (idx % 2 === 0) ? (esWord || enWord) : (enWord || esWord);
+        }
       } else {
         word = state.answers[cat.id] || '';
       }
+      playerWords[p.id][cat.id] = word.trim();
+    });
+  });
 
-      const isValidLetter = word.length > 0 && normalizeLetter(word[0]) === normalizeLetter(state.currentLetter);
-      const points = isValidLetter ? 100 : 0;
+  // 2. Count occurrences and valid players per category
+  state.categories.forEach(cat => {
+    const wordCounts = {};
+    let validCount = 0;
+
+    state.players.forEach(p => {
+      const raw = playerWords[p.id][cat.id] || '';
+      const norm = normalizeWord(raw);
+      if (norm.length > 0 && normalizeLetter(raw[0]) === normalizeLetter(state.currentLetter)) {
+        wordCounts[norm] = (wordCounts[norm] || 0) + 1;
+        validCount++;
+      }
+    });
+
+    state.players.forEach(p => {
+      if (!evaluations[p.id]) evaluations[p.id] = {};
+      const raw = playerWords[p.id][cat.id] || '';
+      const norm = normalizeWord(raw);
+      const hasWord = norm.length > 0;
+      const matchesLetter = hasWord && normalizeLetter(raw[0]) === normalizeLetter(state.currentLetter);
+      const count = matchesLetter ? (wordCounts[norm] || 1) : 1;
+
+      let status = 'empty';
+      let points = 0;
+
+      if (!hasWord) {
+        status = 'empty';
+        points = 0;
+      } else if (!matchesLetter) {
+        status = 'wrong_letter';
+        points = 0;
+      } else if (count > 1) {
+        // Repeated word across players yields lower score (50 pts)
+        status = 'duplicate';
+        points = 50;
+      } else if (validCount === 1 && state.players.length > 1 && state.settings.bonus_sole_answer) {
+        status = 'sole_survivor';
+        points = 200;
+      } else {
+        status = 'valid';
+        points = 100;
+      }
 
       evaluations[p.id][cat.id] = {
-        word: word,
+        word: raw,
         points: points,
-        status: isValidLetter ? 'valid' : 'empty',
+        status: status,
         approvals: 0,
         voters: {},
       };
@@ -827,8 +959,9 @@ function offlineVote(targetPlayerId, categoryId, approve) {
     pEval.status = 'rejected';
     pEval.points = 0;
   } else {
-    pEval.status = 'valid';
-    pEval.points = 100;
+    // If was duplicate, 50 pts, else 100 pts
+    pEval.status = pEval.status === 'duplicate' ? 'duplicate' : 'valid';
+    pEval.points = pEval.status === 'duplicate' ? 50 : 100;
   }
   renderReview();
 }
@@ -859,6 +992,11 @@ function offlineRestart() {
 }
 
 // Helpers
+function normalizeWord(s) {
+  if (!s) return '';
+  return s.trim().toLowerCase().split('').map(normalizeLetter).join('');
+}
+
 function normalizeLetter(c) {
   if (!c) return '';
   const map = { 'á':'a', 'é':'e', 'í':'i', 'ó':'o', 'ú':'u', 'ü':'u' };
