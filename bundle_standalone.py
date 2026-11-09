@@ -20,6 +20,7 @@ def bundle(target_output=None):
     css = (public_dir / 'style.css').read_text(encoding='utf-8')
     qrcode_js = (public_dir / 'qrcode.min.js').read_text(encoding='utf-8')
     audio_js = (public_dir / 'audio.js').read_text(encoding='utf-8')
+    dict_js = (public_dir / 'dictionary.js').read_text(encoding='utf-8')
     app_js = (public_dir / 'app.js').read_text(encoding='utf-8')
 
     # Standalone artifact always defaults to offline self-contained engine
@@ -42,6 +43,12 @@ def bundle(target_output=None):
     html = re.sub(
         r'<script\s+src="/audio\.js[^"]*"></script>',
         lambda m: f'<script>\n{audio_js}\n</script>',
+        html
+    )
+
+    html = re.sub(
+        r'<script\s+src="/dictionary\.js[^"]*"></script>',
+        lambda m: f'<script>\n{dict_js}\n</script>',
         html
     )
 

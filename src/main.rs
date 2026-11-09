@@ -392,11 +392,13 @@ async fn run_game_ticker(state: AppState) {
                     }
                 }
                 GamePhase::Playing => {
-                    // Random bot basta call if bots are in the game
+                    room.round_elapsed_seconds += 1;
+                    // Bots wait at least 45 seconds before considering calling basta,
+                    // ensuring human players have ample time to write their answers without feeling rushed!
                     let has_bots = room.players.iter().any(|p| p.is_bot);
-                    if has_bots {
+                    if has_bots && room.round_elapsed_seconds >= 45 {
                         let mut rng = rand::rng();
-                        // 4% chance per second per bot to call basta if they have answers
+                        // 4% chance per second once 45 seconds have passed (typical round: 45-65 seconds)
                         if rng.random_bool(0.04) {
                             if let Some(bot) = room
                                 .players

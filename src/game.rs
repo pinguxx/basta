@@ -21,6 +21,7 @@ pub struct Room {
     pub settings: GameSettings,
     pub latest_round_review: Option<RoundScore>,
     pub history: Vec<RoundScore>,
+    pub round_elapsed_seconds: u32,
     pub subscribers: HashMap<String, UnboundedSender<ServerMessage>>,
 }
 
@@ -40,6 +41,7 @@ impl Room {
             settings,
             latest_round_review: None,
             history: Vec::new(),
+            round_elapsed_seconds: 0,
             subscribers: HashMap::new(),
         }
     }
@@ -149,6 +151,7 @@ impl Room {
         self.review_remaining = None;
         self.caller_id = None;
         self.caller_name = None;
+        self.round_elapsed_seconds = 0;
 
         for p in &mut self.players {
             p.current_answers.clear();
@@ -245,7 +248,6 @@ impl Room {
 
             for (_pid, raw, norm) in &player_answers {
                 if !norm.is_empty() && starts_with_letter(raw, letter) {
-                    *word_counts.entry(norm.clone()).or_insert(0) += 1;
                     let is_dict = Dictionary::is_valid_word(
                         cat_id,
                         raw,
@@ -253,6 +255,7 @@ impl Room {
                         &self.settings.language_mode,
                     );
                     if is_dict || cat_id.starts_with("custom_") {
+                        *word_counts.entry(norm.clone()).or_insert(0) += 1;
                         valid_player_count += 1;
                     }
                 }
@@ -269,28 +272,36 @@ impl Room {
                         letter,
                         &self.settings.language_mode,
                     );
-                let count = if has_word && matches_letter {
-                    *word_counts.get(&norm).unwrap_or(&1)
-                } else {
-                    1
-                };
+                let count =
+                    if has_word && matches_letter && (in_dict || cat_id.starts_with("custom_")) {
+                        *word_counts.get(&norm).unwrap_or(&1)
+                    } else {
+                        1
+                    };
 
                 let (mut status, mut points) = if !has_word {
                     ("empty".to_string(), 0)
                 } else if !matches_letter {
                     ("wrong_letter".to_string(), 0)
-                } else if count > 1 {
-                    // Repeated words across players always receive a lower score (50 pts)
-                    ("duplicate".to_string(), 50)
                 } else if !in_dict && !cat_id.starts_with("custom_") {
-                    // For custom categories or disputed words, start provisional
-                    ("disputed".to_string(), 100)
+                    // Non-dictionary gibberish (e.g. "fff") receives 0 points!
+                    ("invalid".to_string(), 0)
+                } else if count == 2 {
+                    // 50 points if 2 persons have the same word
+                    ("duplicate".to_string(), 50)
+                } else if count == 3 {
+                    // 25 points if 3 persons have the same word
+                    ("duplicate".to_string(), 25)
+                } else if count >= 4 {
+                    // 10 points for 4 or more persons
+                    ("duplicate".to_string(), 10)
                 } else if valid_player_count == 1
                     && self.players.len() > 1
                     && self.settings.bonus_sole_answer
                 {
                     ("sole_survivor".to_string(), 200)
                 } else {
+                    // 100 points if 1 person
                     ("valid".to_string(), 100)
                 };
 
@@ -309,10 +320,21 @@ impl Room {
                     (0, HashMap::new())
                 };
 
-                // If negative approvals, reject
+                // If negative approvals, reject; if approved, grant points
                 if approvals < 0 {
                     status = "rejected".to_string();
                     points = 0;
+                } else if approvals > 0 && status == "invalid" {
+                    status = "valid".to_string();
+                    points = if count == 2 {
+                        50
+                    } else if count == 3 {
+                        25
+                    } else if count >= 4 {
+                        10
+                    } else {
+                        100
+                    };
                 }
 
                 let eval = AnswerEvaluation {
@@ -527,5 +549,65 @@ mod tests {
         assert_eq!(p1_evals["animal"].status, "valid");
         assert_eq!(p2_evals["animal"].points, 100);
         assert_eq!(p2_evals["animal"].status, "valid");
+    }
+
+    #[test]
+    fn test_gibberish_rejection_fuzzy_matching_and_tiered_scoring() {
+        let settings = GameSettings {
+            language_mode: crate::models::LanguageMode::Both,
+            ..GameSettings::default()
+        };
+        let mut room = Room::new("BASTA4".to_string(), settings);
+
+        let p1 = room.add_player("P1".to_string(), "👩".to_string());
+        let p2 = room.add_player("P2".to_string(), "👨".to_string());
+        let p3 = room.add_player("P3".to_string(), "🧒".to_string());
+        let p4 = room.add_player("P4".to_string(), "👧".to_string());
+
+        assert!(room.start_game().is_ok());
+        room.current_letter = Some('F');
+
+        // P1 writes gibberish "fff" -> must be rejected with 0 points!
+        room.submit_field(&p1, "fruta_comida", "fff");
+
+        // P2 writes typo "freza" (distance 1 to "fresa") -> must fuzzy match and be accepted!
+        room.submit_field(&p2, "fruta_comida", "freza");
+
+        // P1, P2, P3 write the exact same valid word "Foca" -> 3 persons = 25 pts each!
+        room.submit_field(&p1, "animal", "Foca");
+        room.submit_field(&p2, "animal", "Foca");
+        room.submit_field(&p3, "animal", "Foca");
+        // P4 writes distinct valid animal "Falcon" -> 100 pts!
+        room.submit_field(&p4, "animal", "Falcon");
+
+        // 4 persons write the exact same word "Francia" -> 4+ persons = 10 pts each!
+        room.submit_field(&p1, "pais_ciudad", "Francia");
+        room.submit_field(&p2, "pais_ciudad", "Francia");
+        room.submit_field(&p3, "pais_ciudad", "Francia");
+        room.submit_field(&p4, "pais_ciudad", "Francia");
+
+        room.call_basta(&p1).unwrap();
+        room.trigger_review();
+
+        let review = room.latest_round_review.as_ref().unwrap();
+
+        // 1. Gibberish "fff" gets 0 points!
+        assert_eq!(review.evaluations[&p1]["fruta_comida"].points, 0);
+        assert_eq!(review.evaluations[&p1]["fruta_comida"].status, "invalid");
+
+        // 2. Fuzzy match "freza" gets points!
+        assert!(review.evaluations[&p2]["fruta_comida"].points > 0);
+
+        // 3. 3 persons with same word ("Foca") -> 25 points each!
+        assert_eq!(review.evaluations[&p1]["animal"].points, 25);
+        assert_eq!(review.evaluations[&p2]["animal"].points, 25);
+        assert_eq!(review.evaluations[&p3]["animal"].points, 25);
+        assert_eq!(review.evaluations[&p4]["animal"].points, 100);
+
+        // 4. 4 persons with same word ("Francia") -> 10 points each!
+        assert_eq!(review.evaluations[&p1]["pais_ciudad"].points, 10);
+        assert_eq!(review.evaluations[&p2]["pais_ciudad"].points, 10);
+        assert_eq!(review.evaluations[&p3]["pais_ciudad"].points, 10);
+        assert_eq!(review.evaluations[&p4]["pais_ciudad"].points, 10);
     }
 }

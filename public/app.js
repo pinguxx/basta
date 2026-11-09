@@ -454,6 +454,12 @@ function renderActiveRound() {
       checkBastaButtonState();
     });
 
+    input.addEventListener('focus', () => {
+      setTimeout(() => {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    });
+
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -461,6 +467,11 @@ function renderActiveRound() {
       }
     });
   });
+
+  // Dedicated bottom spacer to ensure the last input is 100% visible and unblocked
+  const spacer = document.createElement('div');
+  spacer.className = 'sheet-bottom-spacer';
+  container.appendChild(spacer);
 
   checkBastaButtonState();
 }
@@ -543,15 +554,21 @@ function renderReview() {
       };
 
       const myVote = pEval.voters[state.playerId] || 0;
-      const ptsClass = pEval.points === 200 ? 'p200' : pEval.points === 100 ? 'p100' : pEval.points === 50 ? 'p50' : 'p0';
+      const ptsClass = pEval.points === 200 ? 'p200' : pEval.points === 100 ? 'p100' : pEval.points === 50 ? 'p50' : pEval.points === 25 ? 'p25' : pEval.points === 10 ? 'p10' : 'p0';
 
       let statusBadge = '';
       if (pEval.status === 'duplicate') {
-        statusBadge = '<span class="status-badge duplicate" title="Palabra repetida con otro jugador">Repetida (50 pts)</span>';
+        statusBadge = `<span class="status-badge duplicate" title="Palabra repetida con otros jugadores">Repetida (${pEval.points} pts)</span>`;
       } else if (pEval.status === 'sole_survivor') {
-        statusBadge = '<span class="status-badge sole" title="Única respuesta válida en la sala">¡Única! (+200 pts)</span>';
+        statusBadge = '<span class="status-badge sole" title="Única respuesta válida en toda la sala">¡Única! (+200 pts)</span>';
+      } else if (pEval.status === 'fuzzy') {
+        statusBadge = `<span class="status-badge fuzzy" title="Aceptada por similitud con ${escapeHTML(pEval.matched || '')}">Ortografía aceptada (${escapeHTML(pEval.matched || '')})</span>`;
+      } else if (pEval.status === 'invalid') {
+        statusBadge = '<span class="status-badge invalid" title="Palabra no reconocida o inventada">Palabra no válida (0 pts)</span>';
+      } else if (pEval.status === 'rejected') {
+        statusBadge = '<span class="status-badge invalid" title="Palabra rechazada por votación">Rechazada (0 pts)</span>';
       } else if (pEval.status === 'disputed') {
-        statusBadge = '<span class="status-badge disputed" title="Palabra no registrada en diccionario oficial">En votación</span>';
+        statusBadge = '<span class="status-badge disputed" title="Palabra en votación">En votación</span>';
       }
 
       answersHTML += `
@@ -823,16 +840,21 @@ function offlineStartRound() {
   renderActiveRound();
   showView('playing');
 
-  // Simulate bot typing delay
-  setTimeout(() => {
+  // Bots wait 45 to 65 seconds before calling Basta, giving human players ample time!
+  if (state.botBastaTimer) clearTimeout(state.botBastaTimer);
+  const botDelay = 45000 + Math.floor(Math.random() * 20000);
+  state.botBastaTimer = setTimeout(() => {
     if (state.phase === 'Playing') {
-      offlineCallBasta('🤖 El Chavo');
+      const bots = state.players.filter(p => p.is_bot);
+      const caller = bots.length > 0 ? bots[Math.floor(Math.random() * bots.length)].name : '🤖 El Chavo';
+      offlineCallBasta(caller);
     }
-  }, 22000);
+  }, botDelay);
 }
 
 function offlineCallBasta(callerName = 'Tú') {
   if (state.phase !== 'Playing') return;
+  if (state.botBastaTimer) clearTimeout(state.botBastaTimer);
   state.phase = 'BastaCountdown';
   window.soundFX.playBastaAlarm();
   showBastaNotification(callerName);
@@ -849,6 +871,115 @@ function offlineCallBasta(callerName = 'Tú') {
   }, 1000);
 }
 
+// Levenshtein distance algorithm for fuzzy matching
+function levenshteinDistance(a, b) {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+
+  const prev = new Array(n + 1);
+  const curr = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+    }
+    for (let j = 0; j <= n; j++) prev[j] = curr[j];
+  }
+  return prev[n];
+}
+
+// Gibberish detector: rejects consecutive identical characters (e.g. "fff") or vowel-less strings
+function isGibberish(clean) {
+  if (!clean || clean.length < 2) return true;
+
+  // 3 or more identical consecutive characters (e.g. "fff", "aaa", "zzz")
+  if (/([a-z])\1\1/i.test(clean)) return true;
+
+  // Words of length >= 4 with no vowels at all (e.g. "sdfg", "qwrty")
+  if (clean.length >= 4 && !/[aeiouyáéíóúü]/i.test(clean)) return true;
+
+  return false;
+}
+
+// Client-side dictionary validation with fuzzy matching
+function validateWordClient(categoryId, rawWord, letter, langMode = 'both') {
+  const clean = normalizeWord(rawWord);
+  if (!clean || clean.length < 2) {
+    return { valid: false, status: 'empty', reason: 'Palabra vacía' };
+  }
+
+  if (normalizeLetter(clean[0]) !== normalizeLetter(letter)) {
+    return { valid: false, status: 'wrong_letter', reason: 'Letra incorrecta' };
+  }
+
+  if (isGibberish(clean)) {
+    return { valid: false, status: 'invalid', reason: 'Palabra no válida' };
+  }
+
+  if (categoryId.startsWith('custom_')) {
+    return { valid: true, status: 'valid', matched: rawWord };
+  }
+
+  const dictObj = typeof BASTA_DICTIONARY !== 'undefined' ? BASTA_DICTIONARY : null;
+  let wordList = [];
+  if (dictObj) {
+    if (langMode === 'es' || langMode === 'both') {
+      wordList = wordList.concat(dictObj.es?.[categoryId] || []);
+    }
+    if (langMode === 'en' || langMode === 'both') {
+      wordList = wordList.concat(dictObj.en?.[categoryId] || []);
+    }
+  }
+
+  // Fallback to offline dict subsets if needed
+  if (wordList.length === 0) {
+    const esSingle = OFFLINE_DICT[letter]?.[categoryId];
+    const enSingle = OFFLINE_DICT_EN[letter]?.[categoryId];
+    if (esSingle) wordList.push(esSingle);
+    if (enSingle) wordList.push(enSingle);
+  }
+
+  // Filter candidates starting with the letter
+  const candidates = wordList.filter(w => normalizeLetter(w[0]) === normalizeLetter(letter));
+
+  // 1. Exact match
+  for (const dictWord of candidates) {
+    if (normalizeWord(dictWord) === clean) {
+      return { valid: true, status: 'valid', matched: dictWord, distance: 0 };
+    }
+  }
+
+  // 2. Fuzzy match
+  let bestMatch = null;
+  let bestDist = 999;
+  for (const dictWord of candidates) {
+    const normDict = normalizeWord(dictWord);
+    const dist = levenshteinDistance(clean, normDict);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestMatch = dictWord;
+    }
+  }
+
+  // Distance 1 for words of length >= 4 (e.g. "freza" -> "fresa", "aguil" -> "águila")
+  if (bestMatch && clean.length >= 4 && bestDist === 1) {
+    return { valid: true, status: 'valid', matched: bestMatch, distance: 1, fuzzy: true };
+  }
+
+  // Distance 2 for long words of length >= 7
+  if (bestMatch && clean.length >= 7 && bestDist <= 2) {
+    return { valid: true, status: 'valid', matched: bestMatch, distance: 2, fuzzy: true };
+  }
+
+  // Not in dictionary and no fuzzy match -> Gibberish / invalid! 0 points!
+  return { valid: false, status: 'invalid', reason: 'Palabra no encontrada' };
+}
+
 function offlineTriggerReview(callerName) {
   state.phase = 'Reviewing';
   const evaluations = {};
@@ -861,15 +992,24 @@ function offlineTriggerReview(callerName) {
     state.categories.forEach(cat => {
       let word = '';
       if (p.is_bot) {
-        const esWord = OFFLINE_DICT[state.currentLetter]?.[cat.id] || '';
-        const enWord = OFFLINE_DICT_EN[state.currentLetter]?.[cat.id] || '';
-        if (langMode === 'en') {
-          word = enWord;
-        } else if (langMode === 'es') {
-          word = esWord;
+        const dict = typeof BASTA_DICTIONARY !== 'undefined' ? BASTA_DICTIONARY : null;
+        let esList = (dict?.es?.[cat.id] || []).filter(w => normalizeLetter(w[0]) === normalizeLetter(state.currentLetter));
+        let enList = (dict?.en?.[cat.id] || []).filter(w => normalizeLetter(w[0]) === normalizeLetter(state.currentLetter));
+
+        if (esList.length === 0 && OFFLINE_DICT[state.currentLetter]?.[cat.id]) {
+          esList = [OFFLINE_DICT[state.currentLetter][cat.id]];
+        }
+        if (enList.length === 0 && OFFLINE_DICT_EN[state.currentLetter]?.[cat.id]) {
+          enList = [OFFLINE_DICT_EN[state.currentLetter][cat.id]];
+        }
+
+        if (langMode === 'en' && enList.length > 0) {
+          word = enList[Math.floor(Math.random() * enList.length)];
+        } else if (langMode === 'es' && esList.length > 0) {
+          word = esList[Math.floor(Math.random() * esList.length)];
         } else {
-          // both: alternate between ES and EN
-          word = (idx % 2 === 0) ? (esWord || enWord) : (enWord || esWord);
+          const list = (idx % 2 === 0 && esList.length > 0) ? esList : (enList.length > 0 ? enList : esList);
+          word = list.length > 0 ? list[Math.floor(Math.random() * list.length)] : '';
         }
       } else {
         word = state.answers[cat.id] || '';
@@ -878,16 +1018,20 @@ function offlineTriggerReview(callerName) {
     });
   });
 
-  // 2. Count occurrences and valid players per category
+  // 2. Validate all words and count occurrences of valid words
   state.categories.forEach(cat => {
     const wordCounts = {};
+    const validationResults = {};
     let validCount = 0;
 
     state.players.forEach(p => {
       const raw = playerWords[p.id][cat.id] || '';
-      const norm = normalizeWord(raw);
-      if (norm.length > 0 && normalizeLetter(raw[0]) === normalizeLetter(state.currentLetter)) {
-        wordCounts[norm] = (wordCounts[norm] || 0) + 1;
+      const v = validateWordClient(cat.id, raw, state.currentLetter, langMode);
+      validationResults[p.id] = v;
+
+      if (v.valid) {
+        const key = normalizeWord(v.matched || raw);
+        wordCounts[key] = (wordCounts[key] || 0) + 1;
         validCount++;
       }
     });
@@ -895,36 +1039,50 @@ function offlineTriggerReview(callerName) {
     state.players.forEach(p => {
       if (!evaluations[p.id]) evaluations[p.id] = {};
       const raw = playerWords[p.id][cat.id] || '';
-      const norm = normalizeWord(raw);
-      const hasWord = norm.length > 0;
-      const matchesLetter = hasWord && normalizeLetter(raw[0]) === normalizeLetter(state.currentLetter);
-      const count = matchesLetter ? (wordCounts[norm] || 1) : 1;
+      const v = validationResults[p.id];
 
       let status = 'empty';
       let points = 0;
 
-      if (!hasWord) {
+      if (!raw || raw.length === 0) {
         status = 'empty';
         points = 0;
-      } else if (!matchesLetter) {
-        status = 'wrong_letter';
+      } else if (!v.valid) {
+        // Gibberish like "fff" gets 0 points!
+        status = v.status; // 'invalid' or 'wrong_letter'
         points = 0;
-      } else if (count > 1) {
-        // Repeated word across players yields lower score (50 pts)
-        status = 'duplicate';
-        points = 50;
-      } else if (validCount === 1 && state.players.length > 1 && state.settings.bonus_sole_answer) {
-        status = 'sole_survivor';
-        points = 200;
       } else {
-        status = 'valid';
-        points = 100;
+        // Tiered duplicate scoring:
+        // 1 person = 100 pts, 2 persons = 50 pts, 3 persons = 25 pts, 4+ persons = 10 pts!
+        const key = normalizeWord(v.matched || raw);
+        const count = wordCounts[key] || 1;
+
+        if (count === 1) {
+          if (validCount === 1 && state.players.length > 1 && state.settings.bonus_sole_answer) {
+            status = 'sole_survivor';
+            points = 200;
+          } else {
+            status = v.fuzzy ? 'fuzzy' : 'valid';
+            points = 100;
+          }
+        } else if (count === 2) {
+          status = 'duplicate';
+          points = 50;
+        } else if (count === 3) {
+          status = 'duplicate';
+          points = 25;
+        } else {
+          status = 'duplicate';
+          points = 10;
+        }
       }
 
       evaluations[p.id][cat.id] = {
         word: raw,
         points: points,
         status: status,
+        matched: v.matched || raw,
+        fuzzy: !!v.fuzzy,
         approvals: 0,
         voters: {},
       };
@@ -959,10 +1117,16 @@ function offlineVote(targetPlayerId, categoryId, approve) {
     pEval.status = 'rejected';
     pEval.points = 0;
   } else {
-    // If was duplicate, 50 pts, else 100 pts
-    pEval.status = pEval.status === 'duplicate' ? 'duplicate' : 'valid';
-    pEval.points = pEval.status === 'duplicate' ? 50 : 100;
+    pEval.status = 'valid';
+    pEval.points = pEval.points > 0 ? pEval.points : 100;
   }
+
+  // Recalculate round points
+  state.players.forEach(p => {
+    const total = Object.values(state.latestReview.evaluations[p.id]).reduce((sum, e) => sum + e.points, 0);
+    state.latestReview.round_points[p.id] = total;
+  });
+
   renderReview();
 }
 

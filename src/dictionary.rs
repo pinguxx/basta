@@ -61,6 +61,60 @@ impl Dictionary {
         }
     }
 
+    pub fn levenshtein(a: &str, b: &str) -> usize {
+        let a_chars: Vec<char> = a.chars().collect();
+        let b_chars: Vec<char> = b.chars().collect();
+        let m = a_chars.len();
+        let n = b_chars.len();
+
+        if m == 0 {
+            return n;
+        }
+        if n == 0 {
+            return m;
+        }
+
+        let mut prev: Vec<usize> = (0..=n).collect();
+        let mut curr = vec![0; n + 1];
+
+        for i in 1..=m {
+            curr[0] = i;
+            for j in 1..=n {
+                let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                    0
+                } else {
+                    1
+                };
+                curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+            }
+            prev.copy_from_slice(&curr);
+        }
+
+        prev[n]
+    }
+
+    pub fn is_gibberish(clean: &str) -> bool {
+        if clean.len() < 2 {
+            return true;
+        }
+
+        let chars: Vec<char> = clean.chars().collect();
+        // 3 or more identical consecutive characters (e.g. "fff", "aaa", "zzz")
+        if chars.windows(3).any(|w| w[0] == w[1] && w[1] == w[2]) {
+            return true;
+        }
+
+        // Words of length >= 4 that contain zero vowels (e.g. "sdfg", "rtkp", "qwrty")
+        let has_vowel = clean
+            .chars()
+            .any(|c| matches!(c, 'a' | 'e' | 'i' | 'o' | 'u' | 'y'));
+        if clean.len() >= 4 && !has_vowel {
+            return true;
+        }
+
+        false
+    }
+
     pub fn is_valid_word(
         category_id: &str,
         word: &str,
@@ -68,27 +122,35 @@ impl Dictionary {
         lang_mode: &LanguageMode,
     ) -> bool {
         let clean = normalize_str(word);
-        if clean.is_empty() || !starts_with_letter(&clean, letter) {
+        if clean.len() < 2 || !starts_with_letter(&clean, letter) || Self::is_gibberish(&clean) {
             return false;
         }
 
-        let in_es = || {
-            let words = Self::get_category_words_es(category_id);
+        let check_list = |words: &[&'static str]| -> bool {
             if words.is_empty() {
-                clean.len() >= 2
-            } else {
-                words.iter().any(|w| normalize_str(w) == clean)
+                return false;
             }
+            for &w in words {
+                if !starts_with_letter(w, letter) {
+                    continue;
+                }
+                let norm_w = normalize_str(w);
+                if norm_w == clean {
+                    return true;
+                }
+                let dist = Self::levenshtein(&clean, &norm_w);
+                if clean.len() >= 4 && norm_w.len() >= 4 && dist == 1 {
+                    return true;
+                }
+                if clean.len() >= 7 && norm_w.len() >= 7 && dist <= 2 {
+                    return true;
+                }
+            }
+            false
         };
 
-        let in_en = || {
-            let words = Self::get_category_words_en(category_id);
-            if words.is_empty() {
-                clean.len() >= 2
-            } else {
-                words.iter().any(|w| normalize_str(w) == clean)
-            }
-        };
+        let in_es = || check_list(Self::get_category_words_es(category_id));
+        let in_en = || check_list(Self::get_category_words_en(category_id));
 
         match lang_mode {
             LanguageMode::Spanish => in_es(),
