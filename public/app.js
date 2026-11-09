@@ -106,6 +106,7 @@ function initApp() {
   bindUIEvents();
   setupURLParameters();
   initTheme();
+  renderQuipChips();
   showView('welcome');
 }
 
@@ -363,6 +364,9 @@ function bindUIEvents() {
 
   // Download Trophy Image
   document.getElementById('btn-download-trophy').addEventListener('click', generateTrophyImage);
+
+  // Initialize funny yell quip chips
+  renderQuipChips();
 }
 
 function setupURLParameters() {
@@ -454,6 +458,11 @@ function handleServerMessage(msg) {
     case 'basta_triggered':
       window.soundFX.playBastaAlarm();
       showBastaNotification(msg.caller_name);
+      break;
+    case 'chat_quip':
+      if (msg.player_name !== state.playerName) {
+        showQuipToast(msg.player_name, msg.avatar || '🤠', msg.message);
+      }
       break;
     case 'timer_tick':
       updateTimerDisplay(msg.seconds_remaining, msg.phase);
@@ -1058,6 +1067,16 @@ function offlineCallBasta(callerName = 'Tú') {
   window.soundFX.playBastaAlarm();
   showBastaNotification(callerName);
 
+  // Show a funny quip shout from the caller
+  const callerObj = state.players.find(p => p.name === callerName);
+  const avatar = callerObj ? callerObj.avatar : (callerName === 'Tú' ? (state.players.find(p => p.id === state.playerId)?.avatar || '🤠') : '🗣️');
+  showQuipToast(callerName, avatar, '¡Basta para mí, basta para todos! 🛑');
+
+  // Bots react to the basta call!
+  if (state.players.some(p => p.is_bot)) {
+    triggerBotQuipReaction();
+  }
+
   let seconds = 10;
   updateTimerDisplay(seconds, 'BastaCountdown');
   const timer = setInterval(() => {
@@ -1068,6 +1087,159 @@ function offlineCallBasta(callerName = 'Tú') {
       offlineTriggerReview(callerName);
     }
   }, 1000);
+}
+
+// ==========================================
+// FUNNY YELLS & PRE-WRITTEN QUIPS (GRITOS)
+// ==========================================
+const BASTA_QUIPS = [
+  { label: '🏃 ¡Córranle!', text: '¡Córranle que ya acabé! 🏃💨' },
+  { label: '✏️ ¡Lápiz arriba!', text: '¡Lápiz arriba, manos a la cabeza! ✏️🙌' },
+  { label: '🛑 ¡Basta para todos!', text: '¡Basta para mí, basta para todos! 🛑' },
+  { label: '🙈 ¡No supe una!', text: '¡En una no supe qué poner! 🙈😅' },
+  { label: '🧠 ¡Mente en blanco!', text: '¡Se me fue la mente en blanco! 🧠💨' },
+  { label: '🤞 ¡A ver si pasa!', text: '¡A ver si no me la cancelan! 🤞😂' },
+  { label: '🤨 ¡Ni existe!', text: '¡Esa palabra ni existe! 🤨🔍' },
+  { label: '📜 ¡No inventes!', text: '¡El que inventa no gana! 📜❌' },
+  { label: '🧐 ¡Con lupa!', text: '¡Con lupa te la vamos a revisar! 🧐' },
+  { label: '⏰ ¡Tic tac!', text: '¡Tic tac, se les acaba el tiempo! ⏰🔥' },
+  { label: '💅 ¡Pura calidad!', text: '¡Puras respuestas de calidad aquí! 💅✨' },
+  { label: '⏳ Hurry up!', text: '¡Hurry up, time is ticking! ⏳⚡' },
+  { label: '🙃 I blanked!', text: '¡I totally blanked on one! 🙃' },
+];
+
+const BOT_QUIP_REACTIONS = {
+  'Don Ramón': [
+    '¡No te doy otra nomás porque...! 🥊',
+    '¡Con permisito, dijo Monchito! 🧢',
+    '¡Yo le voy al Necaxa! ⚽',
+    '¡Tenía que ser el Chavo del 8! 🙄',
+  ],
+  'El Chavo': [
+    '¡Fue sin querer queriendo! 📦',
+    '¡Se me chispoteó! 🙈',
+    '¡Es que no me tienen paciencia! 🥺',
+    '¡Eso, eso, eso! 👍',
+  ],
+  'Cantinflas': [
+    '¡Ahí está el detalle, chato! 🎩',
+    '¡Ni hablar, mujer, traes puñal! 🎭',
+    '¡Estamos en lo dicho o qué fue! 🥸',
+    '¡Por ahí hubieras empezado! 🗣️',
+  ],
+  'Sor Juana': [
+    'Hombres necios que acusáis a la mujer sin razón... 📜',
+    '¡Que con ingenio y gracia las palabras fluyan! ✨',
+    '¡Esa rima ni en el convento la aceptan! 🪶',
+  ],
+  'Frida Kahlo': [
+    '¡Pies para qué los quiero si tengo alas pa\' volar! 🌺',
+    '¡Viva la vida y viva el Basta! 🎨',
+    '¡Puro color y nada de trampa! 🖌️',
+  ],
+  'El Chapulín': [
+    '¡Que no cunda el pánico! 🪓',
+    '¡No contaban con mi astucia! 🦗',
+    '¡Mis antenitas de vinil detectan presión! 📡',
+  ],
+  'default': [
+    '¡Ay caramba, qué rápido! ⚡',
+    '¡Esa palabra está muy sospechosa! 🤨',
+    '¡Apúrense que se va el tren! 🚂',
+    '¡Revisen bien esa respuesta! 🔍',
+  ],
+};
+
+function renderQuipChips() {
+  const containers = [
+    document.getElementById('quips-chips-playing'),
+    document.getElementById('quips-chips-review'),
+  ];
+
+  containers.forEach(container => {
+    if (!container) return;
+    container.innerHTML = '';
+    BASTA_QUIPS.forEach(q => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'quip-chip';
+      chip.innerText = q.label;
+      chip.title = q.text;
+      chip.addEventListener('click', (e) => {
+        e.preventDefault();
+        sendQuip(q.text);
+      });
+      container.appendChild(chip);
+    });
+  });
+}
+
+function sendQuip(text) {
+  if (!text) return;
+  const myPlayer = state.players.find(p => p.id === state.playerId);
+  const myAvatar = myPlayer?.avatar || '🤠';
+  const myName = state.playerName || 'Tú';
+
+  if (!useOfflineEngine && state.ws && state.ws.readyState === WebSocket.OPEN) {
+    sendWSMessage({
+      type: 'send_quip',
+      message: text,
+    });
+  }
+
+  showQuipToast(myName, myAvatar, text);
+
+  // In offline mode, bots react to quips
+  if (useOfflineEngine && state.players.some(p => p.is_bot)) {
+    triggerBotQuipReaction();
+  }
+}
+
+function triggerBotQuipReaction() {
+  const bots = state.players.filter(p => p.is_bot);
+  if (bots.length === 0) return;
+  const bot = bots[Math.floor(Math.random() * bots.length)];
+  const delay = 1200 + Math.random() * 1800;
+  setTimeout(() => {
+    if (state.phase !== 'Playing' && state.phase !== 'BastaCountdown' && state.phase !== 'Review') return;
+    const pool = BOT_QUIP_REACTIONS[bot.name] || BOT_QUIP_REACTIONS['default'];
+    const reaction = pool[Math.floor(Math.random() * pool.length)];
+    showQuipToast(bot.name, bot.avatar, reaction);
+  }, delay);
+}
+
+function showQuipToast(sender, avatar, text) {
+  const container = document.getElementById('quip-toast-container');
+  if (!container) return;
+
+  if (window.soundFX && soundFX.playLetterTick) {
+    soundFX.playLetterTick();
+  }
+
+  while (container.children.length >= 3) {
+    container.removeChild(container.firstChild);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = 'quip-toast';
+  toast.innerHTML = `
+    <span class="quip-avatar">${escapeHTML(avatar || '🗣️')}</span>
+    <div class="quip-body">
+      <span class="quip-sender">${escapeHTML(sender)}</span>
+      <span class="quip-text">${escapeHTML(text)}</span>
+    </div>
+  `;
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('fade-out');
+    setTimeout(() => {
+      if (toast.parentNode === container) {
+        container.removeChild(toast);
+      }
+    }, 320);
+  }, 3800);
 }
 
 // Levenshtein distance algorithm for fuzzy matching
@@ -1165,14 +1337,10 @@ function validateWordClient(categoryId, rawWord, letter, langMode = 'both') {
     }
   }
 
-  // Distance 1 for words of length >= 4 (e.g. "freza" -> "fresa", "aguil" -> "águila")
-  if (bestMatch && clean.length >= 4 && bestDist === 1) {
+  // Strict fuzzy matching: only allow distance 1 for words >= 4 letters with matching length (+/- 1)
+  // Eliminates false matches like "armando" to "armario" or "amanda"
+  if (bestMatch && clean.length >= 4 && bestDist === 1 && Math.abs(clean.length - normalizeWord(bestMatch).length) <= 1) {
     return { valid: true, status: 'valid', matched: bestMatch, distance: 1, fuzzy: true };
-  }
-
-  // Distance 2 for long words of length >= 7
-  if (bestMatch && clean.length >= 7 && bestDist <= 2) {
-    return { valid: true, status: 'valid', matched: bestMatch, distance: 2, fuzzy: true };
   }
 
   // Not in dictionary and no fuzzy match -> Gibberish / invalid! 0 points!
@@ -1229,7 +1397,8 @@ function offlineTriggerReview(callerName) {
       validationResults[p.id] = v;
 
       if (v.valid) {
-        const key = normalizeWord(v.matched || raw);
+        // Group by the actual normalized entered word so distinct words (e.g. "Armando" and "Amanda") are never merged!
+        const key = normalizeWord(raw);
         wordCounts[key] = (wordCounts[key] || 0) + 1;
         validCount++;
       }
@@ -1253,7 +1422,7 @@ function offlineTriggerReview(callerName) {
       } else {
         // Tiered duplicate scoring:
         // 1 person = 100 pts, 2 persons = 50 pts, 3 persons = 25 pts, 4+ persons = 10 pts!
-        const key = normalizeWord(v.matched || raw);
+        const key = normalizeWord(raw);
         const count = wordCounts[key] || 1;
 
         if (count === 1) {

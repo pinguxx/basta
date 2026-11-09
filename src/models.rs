@@ -191,6 +191,8 @@ pub enum ClientMessage {
     NextRound,
     #[serde(rename = "restart_game")]
     RestartGame,
+    #[serde(rename = "send_quip")]
+    SendQuip { message: String },
     #[serde(rename = "ping")]
     Ping,
 }

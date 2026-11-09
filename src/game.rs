@@ -610,4 +610,41 @@ mod tests {
         assert_eq!(review.evaluations[&p3]["pais_ciudad"].points, 10);
         assert_eq!(review.evaluations[&p4]["pais_ciudad"].points, 10);
     }
+
+    #[test]
+    fn test_armando_vs_amanda_and_no_armario_false_match() {
+        let settings = GameSettings {
+            language_mode: crate::models::LanguageMode::Both,
+            ..GameSettings::default()
+        };
+        let mut room = Room::new("BASTA5".to_string(), settings);
+
+        let p1 = room.add_player("P1".to_string(), "👩".to_string());
+        let p2 = room.add_player("P2".to_string(), "👨".to_string());
+
+        assert!(room.start_game().is_ok());
+        room.current_letter = Some('A');
+
+        // P1 writes Armando, P2 writes Amanda -> distinct valid names, each gets 100 points!
+        room.submit_field(&p1, "nombre", "Armando");
+        room.submit_field(&p2, "nombre", "Amanda");
+
+        // P1 writes "armando" in cosa_objeto -> must NOT match "armario"! Receives 0 points!
+        room.submit_field(&p1, "cosa_objeto", "armando");
+
+        room.call_basta(&p1).unwrap();
+        room.trigger_review();
+
+        let review = room.latest_round_review.as_ref().unwrap();
+
+        // Armando and Amanda are NOT duplicates:
+        assert_eq!(review.evaluations[&p1]["nombre"].points, 100);
+        assert_eq!(review.evaluations[&p1]["nombre"].status, "valid");
+        assert_eq!(review.evaluations[&p2]["nombre"].points, 100);
+        assert_eq!(review.evaluations[&p2]["nombre"].status, "valid");
+
+        // "armando" in cosa_objeto is rejected (0 points):
+        assert_eq!(review.evaluations[&p1]["cosa_objeto"].points, 0);
+        assert_eq!(review.evaluations[&p1]["cosa_objeto"].status, "invalid");
+    }
 }

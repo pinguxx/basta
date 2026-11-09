@@ -999,3 +999,132 @@ html[data-theme="talavera"] .category-row {
 .hidden {
   display: none !important;
 }
+
+/* FUNNY YELLS / QUIPS (GRITOS Y DICHOS) */
+.quip-toast-container {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  pointer-events: none;
+  width: 90%;
+  max-width: 440px;
+}
+
+.quip-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: var(--bg-card);
+  border: 2px solid var(--accent-primary);
+  border-radius: 18px;
+  padding: 0.65rem 1.1rem;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  animation: quipPopIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events: auto;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.quip-toast.fade-out {
+  opacity: 0;
+  transform: translateY(-16px) scale(0.95);
+}
+
+.quip-avatar {
+  font-size: 1.8rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+}
+
+.quip-body {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.quip-sender {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quip-text {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.25;
+}
+
+@keyframes quipPopIn {
+  0% { opacity: 0; transform: translateY(-24px) scale(0.85); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.quips-container {
+  margin: 0.5rem 0 0.9rem;
+  background: var(--bg-card);
+  border: 1px dashed var(--border-soft);
+  border-radius: 12px;
+  padding: 0.55rem 0.85rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.quips-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.quips-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.quips-chips-scroll {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.quip-chip {
+  background: var(--bg-sheet);
+  border: 1px solid var(--border-soft);
+  border-radius: 20px;
+  padding: 0.32rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.quip-chip:hover {
+  background: linear-gradient(135deg, var(--accent-primary), #b91c1c);
+  color: #ffffff;
+  border-color: var(--accent-primary);
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 4px 10px rgba(220, 38, 38, 0.3);
+}
+
+.quip-chip:active {
+  transform: scale(0.96);
+}

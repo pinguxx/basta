@@ -343,6 +343,21 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
                     }
                 }
             }
+            ClientMessage::SendQuip { message } => {
+                if let (Some(code), Some(pid)) = (&current_room_code, &current_player_id) {
+                    let rooms = state.rooms.read().await;
+                    if let Some(room_arc) = rooms.get(code) {
+                        let room = room_arc.read().await;
+                        if let Some(player) = room.players.iter().find(|p| p.id == *pid) {
+                            room.broadcast(ServerMessage::ChatQuip {
+                                player_name: player.name.clone(),
+                                avatar: player.avatar.clone(),
+                                message,
+                            });
+                        }
+                    }
+                }
+            }
             ClientMessage::Ping => {
                 let _ = tx.send(ServerMessage::Pong);
             }

@@ -29,6 +29,9 @@
     </div>
   </header>
 
+  <!-- Floating Funny Yells Toast Notifications -->
+  <div id="quip-toast-container" class="quip-toast-container"></div>
+
   <!-- Main Container -->
   <main class="main-content">
     
@@ -223,6 +226,17 @@
 
       <div id="basta-alert-banner" class="hidden" style="background:#dc2626; color:#fff; text-align:center; padding:0.6rem; border-radius:8px; font-weight:800; margin-bottom:1rem; animation:urgentBlink 0.5s infinite alternate;"></div>
 
+      <!-- Funny Yells / Quips Bar in Playing -->
+      <div class="quips-container">
+        <div class="quips-header">
+          <span class="quips-title">🗣️ Gritos Rápidos:</span>
+          <span style="font-size:0.75rem; color:var(--text-muted);">¡Pícale para gritarle a los demás!</span>
+        </div>
+        <div class="quips-chips-scroll" id="quips-chips-playing">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
       <!-- Ruled Notebook Sheet -->
       <div class="notebook-sheet">
         <div class="notebook-fields" id="notebook-fields-container">
@@ -246,6 +260,17 @@
           Revisa las respuestas de todos los jugadores y vota si alguna palabra es inventada:
         </p>
         <div class="review-caller-badge" id="review-caller-name"></div>
+      </div>
+
+      <!-- Funny Yells / Quips Bar in Review -->
+      <div class="quips-container">
+        <div class="quips-header">
+          <span class="quips-title">🗣️ Gritos en la Calificación:</span>
+          <span style="font-size:0.75rem; color:var(--text-muted);">¡Pícale para meter presión o defenderte!</span>
+        </div>
+        <div class="quips-chips-scroll" id="quips-chips-review">
+          <!-- Rendered by JS -->
+        </div>
       </div>
 
       <div class="review-grid" id="review-grid-container">

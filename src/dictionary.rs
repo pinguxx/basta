@@ -139,10 +139,13 @@ impl Dictionary {
                     return true;
                 }
                 let dist = Self::levenshtein(&clean, &norm_w);
-                if clean.len() >= 4 && norm_w.len() >= 4 && dist == 1 {
-                    return true;
-                }
-                if clean.len() >= 7 && norm_w.len() >= 7 && dist <= 2 {
+                // Strict fuzzy matching: only allow single-character typos (dist == 1) for words >= 4 letters
+                // Eliminates false positives like "armando" (7) matching "armario" (7) or "amanda" (6)
+                if clean.len() >= 4
+                    && norm_w.len() >= 4
+                    && clean.len().abs_diff(norm_w.len()) <= 1
+                    && dist == 1
+                {
                     return true;
                 }
             }
@@ -191,6 +194,7 @@ impl Dictionary {
 
 pub static NOMBRES: &[&str] = &[
     "Alejandro",
+    "Alejandra",
     "Adrián",
     "Alberto",
     "Alfonso",
@@ -198,12 +202,17 @@ pub static NOMBRES: &[&str] = &[
     "Alonso",
     "Álvaro",
     "Amalia",
+    "Amanda",
     "Ana",
     "Andrea",
     "Andrés",
     "Ángel",
     "Antonio",
+    "Armando",
     "Arturo",
+    "Agustín",
+    "Aranza",
+    "Ariadna",
     "Beatriz",
     "Bárbara",
     "Belén",
@@ -1863,6 +1872,7 @@ pub static EN_NAMES: &[&str] = &[
     "Andrew",
     "Angela",
     "Anthony",
+    "Armando",
     "Arthur",
     "Ashley",
     "Austin",
