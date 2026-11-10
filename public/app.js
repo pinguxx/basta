@@ -40,6 +40,8 @@ const state = {
   },
 };
 
+let pendingHostSettings = null;
+
 // Default Mexican Categories
 const DEFAULT_CATEGORIES = [
   { id: 'nombre', name: 'Nombre', icon: '👤', desc: 'Nombre de persona' },
@@ -537,6 +539,16 @@ function bindUIEvents() {
     const countdownSelect = document.getElementById('select-countdown');
     if (countdownSelect) state.settings.countdown_seconds = parseInt(countdownSelect.value, 10);
 
+    pendingHostSettings = {
+      categories: state.settings.categories?.length > 0 ? state.settings.categories : DEFAULT_CATEGORIES,
+      rounds_count: state.settings.rounds_count || 5,
+      countdown_seconds: state.settings.countdown_seconds || 10,
+      review_duration_seconds: state.settings.review_duration_seconds || 35,
+      allow_difficult_letters: false,
+      bonus_sole_answer: true,
+      language_mode: state.settings.language_mode || 'both',
+    };
+
     createOrJoinRoom(null);
   });
 
@@ -592,6 +604,12 @@ function bindUIEvents() {
 
   // Next Round
   document.getElementById('btn-next-round').addEventListener('click', () => {
+    state.answers = {};
+    const timerEl = document.getElementById('hud-timer-display');
+    if (timerEl) {
+      timerEl.textContent = '--:--';
+      timerEl.classList.remove('urgent');
+    }
     if (useOfflineEngine) {
       offlineNextRound();
     } else {
@@ -601,6 +619,12 @@ function bindUIEvents() {
 
   // Restart Game
   document.getElementById('btn-restart-game').addEventListener('click', () => {
+    state.answers = {};
+    const timerEl = document.getElementById('hud-timer-display');
+    if (timerEl) {
+      timerEl.textContent = '--:--';
+      timerEl.classList.remove('urgent');
+    }
     if (useOfflineEngine) {
       offlineRestart();
     } else {
@@ -828,6 +852,9 @@ function handleServerMessage(msg) {
     case 'basta_triggered':
       window.soundFX.playBastaAlarm();
       showBastaNotification(msg.caller_name);
+      if (typeof msg.seconds_remaining === 'number') {
+        updateTimerDisplay(msg.seconds_remaining, 'BastaCountdown');
+      }
       break;
     case 'chat_quip':
       if (msg.player_name !== state.playerName) {
@@ -844,6 +871,23 @@ function handleServerMessage(msg) {
 }
 
 function syncState(serverState) {
+  const roundChanged = state.currentRound !== serverState.current_round;
+  const phaseChanged = state.phase !== serverState.phase;
+
+  // Clear previous round answers when advancing to a new round or entering Playing phase
+  if (roundChanged || (serverState.phase === 'Playing' && phaseChanged)) {
+    state.answers = {};
+    if (state.bastaCountdownInterval) {
+      clearInterval(state.bastaCountdownInterval);
+      state.bastaCountdownInterval = null;
+    }
+    const timerEl = document.getElementById('hud-timer-display');
+    if (timerEl && serverState.phase === 'Playing') {
+      timerEl.textContent = '--:--';
+      timerEl.classList.remove('urgent');
+    }
+  }
+
   state.roomCode = serverState.room_code;
   state.phase = serverState.phase;
   state.currentRound = serverState.current_round;
@@ -862,12 +906,20 @@ function syncState(serverState) {
   if (me) {
     state.playerId = me.id;
     state.isHost = me.is_host;
-    if (me.current_answers) {
+    if (me.current_answers && (serverState.phase === 'Playing' || serverState.phase === 'BastaCountdown')) {
       for (const [catId, word] of Object.entries(me.current_answers)) {
         if (!state.answers[catId] && word) {
           state.answers[catId] = word;
         }
       }
+    }
+
+    if (state.isHost && pendingHostSettings) {
+      sendWSMessage({
+        type: 'update_settings',
+        settings: pendingHostSettings,
+      });
+      pendingHostSettings = null;
     }
   }
 
@@ -942,7 +994,7 @@ function renderLobby() {
   }
   const roundsLabel = document.getElementById('lobby-rounds-label');
   if (roundsLabel && state.settings) {
-    roundsLabel.textContent = `${state.settings.rounds_count || 5} Rondas`;
+    roundsLabel.textContent = `${state.settings.rounds_count || 5} Rondas • ${state.settings.countdown_seconds || 10}s Basta`;
   }
 
   const btnStart = document.getElementById('btn-start-game');
@@ -959,6 +1011,20 @@ function renderActiveRound() {
   document.getElementById('hud-letter-stamp').textContent = state.currentLetter;
   document.getElementById('hud-round-label').textContent = `Ronda ${state.currentRound} de ${state.totalRounds}`;
   
+  // Clear any existing alert banner if not in active countdown
+  const alertBanner = document.getElementById('basta-alert-banner');
+  if (alertBanner && state.phase !== 'BastaCountdown') {
+    alertBanner.classList.add('hidden');
+    alertBanner.textContent = '';
+  }
+
+  // Reset HUD timer to ready state (--:--) unless currently in active BastaCountdown
+  const timerEl = document.getElementById('hud-timer-display');
+  if (timerEl && state.phase !== 'BastaCountdown') {
+    timerEl.textContent = '--:--';
+    timerEl.classList.remove('urgent');
+  }
+
   const container = document.getElementById('notebook-fields-container');
   container.innerHTML = '';
 
@@ -1080,14 +1146,31 @@ function showBastaNotification(callerName) {
 }
 
 function updateTimerDisplay(seconds, phase) {
+  // Never tick or update the playing HUD if we are reviewing or game over
+  if (phase === 'Reviewing' || state.phase === 'Reviewing' || state.phase === 'GameOver') {
+    return;
+  }
   const timerEl = document.getElementById('hud-timer-display');
-  timerEl.textContent = `00:${seconds < 10 ? '0' : ''}${seconds}`;
-  if (seconds <= 5) {
-    timerEl.classList.add('urgent');
-    window.soundFX.playClockTick(true);
-  } else {
+  if (!timerEl) return;
+
+  const sec = Math.max(0, parseInt(seconds, 10) || 0);
+  timerEl.textContent = `00:${sec < 10 ? '0' : ''}${sec}`;
+
+  // Once counter reaches 0 (or below), immediately stop ticking sound and remove urgent styling
+  if (sec <= 0) {
     timerEl.classList.remove('urgent');
-    window.soundFX.playClockTick(false);
+    return;
+  }
+
+  // Only play ticking sound during active Basta countdown, and only when sec > 0
+  if (phase === 'BastaCountdown' || state.phase === 'BastaCountdown') {
+    if (sec <= 5) {
+      timerEl.classList.add('urgent');
+      window.soundFX.playClockTick(true);
+    } else {
+      timerEl.classList.remove('urgent');
+      window.soundFX.playClockTick(false);
+    }
   }
 }
 
@@ -1467,7 +1550,8 @@ function offlineCallBasta(callerName = 'Tú') {
   }
   state.phase = 'BastaCountdown';
   state.bastaCallerName = callerName;
-  state.bastaEndTime = Date.now() + 10000;
+  const countdownSec = state.settings?.countdown_seconds || 10;
+  state.bastaEndTime = Date.now() + countdownSec * 1000;
   window.soundFX.playBastaAlarm();
   showBastaNotification(callerName);
 
@@ -1482,7 +1566,7 @@ function offlineCallBasta(callerName = 'Tú') {
   }
 
   saveGameSession();
-  resumeOfflineBastaCountdown(10, callerName);
+  resumeOfflineBastaCountdown(countdownSec, callerName);
 }
 
 function resumeOfflineBastaCountdown(totalSeconds, callerName) {
@@ -1493,11 +1577,13 @@ function resumeOfflineBastaCountdown(totalSeconds, callerName) {
   updateTimerDisplay(seconds, 'BastaCountdown');
   state.bastaCountdownInterval = setInterval(() => {
     seconds--;
-    updateTimerDisplay(seconds, 'BastaCountdown');
     if (seconds <= 0) {
       clearInterval(state.bastaCountdownInterval);
       state.bastaCountdownInterval = null;
+      updateTimerDisplay(0, 'BastaCountdown');
       offlineTriggerReview(callerName || state.bastaCallerName || 'Tú');
+    } else {
+      updateTimerDisplay(seconds, 'BastaCountdown');
     }
   }, 1000);
 }
