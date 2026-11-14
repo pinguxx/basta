@@ -56,6 +56,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/healthz", get(healthz_handler))
+        .route("/health", get(healthz_handler))
         .route("/api/rooms/new", post(create_room_handler))
         .route("/ws", get(ws_handler))
         .fallback_service(

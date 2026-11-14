@@ -10,10 +10,10 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config && rm -rf /var/lib/apt/lists/*
 
 # Cache dependencies
-COPY Cargo.toml ./
+COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release
-RUN rm -rf src target/release/deps/basta* target/release/basta*
+RUN cargo clean -p basta --release && rm -rf src
 
 # Build actual application
 COPY src ./src

@@ -108,11 +108,7 @@ impl Dictionary {
         let has_vowel = clean
             .chars()
             .any(|c| matches!(c, 'a' | 'e' | 'i' | 'o' | 'u' | 'y'));
-        if clean.len() >= 4 && !has_vowel {
-            return true;
-        }
-
-        false
+        clean.len() >= 4 && !has_vowel
     }
 
     pub fn is_valid_word(
