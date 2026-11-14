@@ -10,7 +10,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config && rm -rf /var/lib/apt/lists/*
 
 # Cache dependencies
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml Cargo.lock* ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release
 RUN cargo clean -p basta --release && rm -rf src
