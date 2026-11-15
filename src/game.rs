@@ -763,4 +763,64 @@ mod tests {
         assert_eq!(room.players.len(), 1);
         assert!(room.players[0].connected);
     }
+
+    #[test]
+    fn test_rounds_selection_and_category_desc_alias() {
+        // Test JSON deserialization of ClientMessage::UpdateSettings with "desc" instead of "description"
+        let json_data = r#"{
+            "type": "update_settings",
+            "settings": {
+                "categories": [
+                    { "id": "nombre", "name": "Nombre", "icon": "👤", "desc": "Nombre de persona" }
+                ],
+                "rounds_count": 3,
+                "countdown_seconds": 10,
+                "review_duration_seconds": 35,
+                "allow_difficult_letters": false,
+                "bonus_sole_answer": true,
+                "language_mode": "both"
+            }
+        }"#;
+
+        let parsed: Result<crate::models::ClientMessage, _> = serde_json::from_str(json_data);
+        assert!(
+            parsed.is_ok(),
+            "Must deserialize UpdateSettings with 'desc' alias"
+        );
+
+        if let Ok(crate::models::ClientMessage::UpdateSettings { settings }) = parsed {
+            assert_eq!(settings.rounds_count, 3);
+            assert_eq!(settings.categories[0].description, "Nombre de persona");
+
+            let mut room = Room::new("ROUNDS3".to_string(), settings);
+            let p1 = room.add_player("Juan".to_string(), "🤠".to_string());
+            assert!(room.start_game().is_ok());
+            assert_eq!(room.current_round, 1);
+            assert_eq!(room.settings.rounds_count, 3);
+
+            // Round 1
+            room.call_basta(&p1).unwrap();
+            room.trigger_review();
+            room.finish_round_and_next();
+            assert_eq!(room.current_round, 2);
+            assert_eq!(room.phase, GamePhase::Playing);
+
+            // Round 2
+            room.call_basta(&p1).unwrap();
+            room.trigger_review();
+            room.finish_round_and_next();
+            assert_eq!(room.current_round, 3);
+            assert_eq!(room.phase, GamePhase::Playing);
+
+            // Round 3 (final round)
+            room.call_basta(&p1).unwrap();
+            room.trigger_review();
+            room.finish_round_and_next();
+
+            // After round 3 of 3, the game must transition to GameOver, NOT continue to 5!
+            assert_eq!(room.phase, GamePhase::GameOver);
+        } else {
+            panic!("Expected UpdateSettings message");
+        }
+    }
 }

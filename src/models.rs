@@ -16,6 +16,7 @@ pub struct Category {
     pub id: String,
     pub name: String,
     pub icon: String,
+    #[serde(alias = "desc", default)]
     pub description: String,
 }
 

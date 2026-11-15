@@ -44,14 +44,14 @@ let pendingHostSettings = null;
 
 // Default Mexican Categories
 const DEFAULT_CATEGORIES = [
-  { id: 'nombre', name: 'Nombre', icon: '👤', desc: 'Nombre de persona' },
-  { id: 'apellido', name: 'Apellido', icon: '📜', desc: 'Apellido común' },
-  { id: 'pais_ciudad', name: 'País o Ciudad', icon: '🌎', desc: 'País, estado o ciudad' },
-  { id: 'animal', name: 'Animal', icon: '🐾', desc: 'Cualquier animal' },
-  { id: 'fruta_comida', name: 'Fruta o Alimento', icon: '🥑', desc: 'Fruta, platillo o bebida' },
-  { id: 'cosa_objeto', name: 'Cosa u Objeto', icon: '📦', desc: 'Objeto cotidiano' },
-  { id: 'color', name: 'Color', icon: '🎨', desc: 'Color o tono' },
-  { id: 'flor_planta', name: 'Flor o Planta', icon: '🌻', desc: 'Flor o hierba' },
+  { id: 'nombre', name: 'Nombre', icon: '👤', description: 'Nombre de persona', desc: 'Nombre de persona' },
+  { id: 'apellido', name: 'Apellido', icon: '📜', description: 'Apellido común', desc: 'Apellido común' },
+  { id: 'pais_ciudad', name: 'País o Ciudad', icon: '🌎', description: 'País, estado o ciudad', desc: 'País, estado o ciudad' },
+  { id: 'animal', name: 'Animal', icon: '🐾', description: 'Cualquier animal', desc: 'Cualquier animal' },
+  { id: 'fruta_comida', name: 'Fruta o Alimento', icon: '🥑', description: 'Fruta, platillo o bebida', desc: 'Fruta, platillo o bebida' },
+  { id: 'cosa_objeto', name: 'Cosa u Objeto', icon: '📦', description: 'Objeto cotidiano', desc: 'Objeto cotidiano' },
+  { id: 'color', name: 'Color', icon: '🎨', description: 'Color o tono', desc: 'Color o tono' },
+  { id: 'flor_planta', name: 'Flor o Planta', icon: '🌻', description: 'Flor o hierba', desc: 'Flor o hierba' },
 ];
 
 // Offline fallback dictionary subset (Spanish)
@@ -798,9 +798,11 @@ function showView(viewName) {
 // WebSocket Connection
 function createOrJoinRoom(code) {
   const protocol = getWebSocketProtocol();
-  const host = getWebSocketHost();
   const playerIdParam = state.playerId ? `&player_id=${encodeURIComponent(state.playerId)}` : '';
-  const wsUrl = `${protocol}//${host}/ws?room=${encodeURIComponent(code || '')}&name=${encodeURIComponent(state.playerName)}&avatar=${encodeURIComponent(state.playerAvatar)}${playerIdParam}`;
+  const roundsParam = state.settings?.rounds_count ? `&rounds_count=${encodeURIComponent(state.settings.rounds_count)}` : '';
+  const countdownParam = state.settings?.countdown_seconds ? `&countdown_seconds=${encodeURIComponent(state.settings.countdown_seconds)}` : '';
+  const langParam = state.settings?.language_mode ? `&language_mode=${encodeURIComponent(state.settings.language_mode)}` : '';
+  const wsUrl = `${protocol}//${host}/ws?room=${encodeURIComponent(code || '')}&name=${encodeURIComponent(state.playerName)}&avatar=${encodeURIComponent(state.playerAvatar)}${playerIdParam}${roundsParam}${countdownParam}${langParam}`;
 
   console.log('Connecting to Basta Axum server via WebSocket at:', wsUrl);
 
@@ -1035,6 +1037,9 @@ function renderActiveRound() {
     const val = state.answers[cat.id] || '';
     const hasValidLetter = val.length > 0 && normalizeLetter(val[0]) === normalizeLetter(state.currentLetter);
 
+    const descText = cat.description || cat.desc || cat.name || '';
+    const placeholderVal = descText ? `${descText}...` : '';
+
     row.innerHTML = `
       <div class="category-row-label">
         <span class="cat-title">${cat.icon} ${escapeHTML(cat.name)}</span>
@@ -1047,7 +1052,7 @@ function renderActiveRound() {
           class="category-input" 
           id="input-cat-${cat.id}" 
           data-cat="${cat.id}"
-          placeholder="${cat.desc}..." 
+          placeholder="${escapeHTML(placeholderVal)}" 
           value="${escapeHTML(val)}"
           autocomplete="off"
           spellcheck="false"
@@ -1439,15 +1444,25 @@ function offlineInitRoom(code) {
   state.isHost = true;
   state.phase = 'Lobby';
   state.currentRound = 0;
+
+  const roundsSelect = document.getElementById('select-rounds-count');
+  const countdownSelect = document.getElementById('select-countdown');
+  const langSelect = document.getElementById('select-language-mode');
+
+  const selectedRounds = (roundsSelect ? parseInt(roundsSelect.value, 10) : 0) || pendingHostSettings?.rounds_count || state.settings?.rounds_count || 5;
+  const selectedCountdown = (countdownSelect ? parseInt(countdownSelect.value, 10) : 0) || pendingHostSettings?.countdown_seconds || state.settings?.countdown_seconds || 10;
+  const selectedLang = (langSelect ? langSelect.value : '') || pendingHostSettings?.language_mode || state.settings?.language_mode || 'both';
+
   state.settings = {
     categories: DEFAULT_CATEGORIES,
-    rounds_count: 5,
-    countdown_seconds: 10,
+    rounds_count: selectedRounds,
+    countdown_seconds: selectedCountdown,
     review_duration_seconds: 35,
     allow_difficult_letters: false,
     bonus_sole_answer: true,
-    language_mode: document.getElementById('select-language-mode')?.value || 'both',
+    language_mode: selectedLang,
   };
+  state.totalRounds = selectedRounds;
   state.players = [
     {
       id: 'usr_me',
@@ -1499,6 +1514,7 @@ function offlineAddBot() {
 }
 
 function offlineStartGame() {
+  state.totalRounds = state.settings?.rounds_count || state.totalRounds || 5;
   state.currentRound = 1;
   state.history = [];
   state.players.forEach(p => p.total_score = 0);
@@ -2012,7 +2028,8 @@ function offlineNextRound() {
     });
   }
 
-  if (state.currentRound >= state.totalRounds) {
+  const maxRounds = state.totalRounds || state.settings?.rounds_count || 5;
+  if (state.currentRound >= maxRounds) {
     state.phase = 'GameOver';
     renderGameOver();
     showView('gameover');

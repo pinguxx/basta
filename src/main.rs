@@ -35,6 +35,9 @@ struct WsQuery {
     player_id: Option<String>,
     name: Option<String>,
     avatar: Option<String>,
+    rounds_count: Option<u32>,
+    countdown_seconds: Option<u32>,
+    language_mode: Option<crate::models::LanguageMode>,
 }
 
 #[tokio::main]
@@ -155,10 +158,21 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
             let room_opt = {
                 let mut rooms = state.rooms.write().await;
                 if !rooms.contains_key(&code) {
-                    let new_room = Arc::new(RwLock::new(Room::new(
-                        code.clone(),
-                        GameSettings::default(),
-                    )));
+                    let mut initial_settings = GameSettings::default();
+                    if let Some(r) = query.rounds_count {
+                        if r > 0 {
+                            initial_settings.rounds_count = r;
+                        }
+                    }
+                    if let Some(c) = query.countdown_seconds {
+                        if c > 0 {
+                            initial_settings.countdown_seconds = c;
+                        }
+                    }
+                    if let Some(ref l) = query.language_mode {
+                        initial_settings.language_mode = l.clone();
+                    }
+                    let new_room = Arc::new(RwLock::new(Room::new(code.clone(), initial_settings)));
                     rooms.insert(code.clone(), new_room);
                 }
                 rooms.get(&code).cloned()
@@ -188,7 +202,10 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
 
         let client_msg: ClientMessage = match serde_json::from_str(&text) {
             Ok(m) => m,
-            Err(_) => continue,
+            Err(e) => {
+                eprintln!("Failed to parse client message: {} | raw: {}", e, text);
+                continue;
+            }
         };
 
         match client_msg {
@@ -216,10 +233,21 @@ async fn handle_socket(socket: WebSocket, query: WsQuery, state: AppState) {
                     rooms
                         .entry(code.clone())
                         .or_insert_with(|| {
-                            Arc::new(RwLock::new(Room::new(
-                                code.clone(),
-                                GameSettings::default(),
-                            )))
+                            let mut initial_settings = GameSettings::default();
+                            if let Some(r) = query.rounds_count {
+                                if r > 0 {
+                                    initial_settings.rounds_count = r;
+                                }
+                            }
+                            if let Some(c) = query.countdown_seconds {
+                                if c > 0 {
+                                    initial_settings.countdown_seconds = c;
+                                }
+                            }
+                            if let Some(l) = query.language_mode.clone() {
+                                initial_settings.language_mode = l;
+                            }
+                            Arc::new(RwLock::new(Room::new(code.clone(), initial_settings)))
                         })
                         .clone()
                 };
